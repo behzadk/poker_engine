@@ -8,11 +8,16 @@ def random_min_raise(current_table_state, this_player):
 	current_bet = current_table_state['current_bet']
 	min_raise = current_table_state['big_blind']
 
+
 	action_type_space = ['CALL', 'RAISE', 'CHECK', 'FOLD']
 
 	# No bets made, can only check or raise
 	if current_bet == 0:
 		action_type_space = ['RAISE', 'CHECK']
+
+	elif current_bet > this_player.stack:
+		action_type_space = ['CALL', 'FOLD']
+
 
 	else:
 		action_type_space = ['CALL', 'RAISE', 'FOLD']
@@ -23,10 +28,17 @@ def random_min_raise(current_table_state, this_player):
 
 	# If call, value to transfer is current bet
 	if chosen_action_type == 'CALL':
-		action_value = current_bet
+		if current_bet > this_player.stack:
+			action_value = this_player.stack
+
+		else:
+			action_value = current_bet
 
 	# If raise, apply min raise
 	elif chosen_action_type == 'RAISE':
+		if min_raise + current_bet > this_player.stack:
+			min_raise = this_player.stack
+
 		action_value = current_bet + min_raise
 
 	# If fold, value to transfer is 0
@@ -62,7 +74,6 @@ def always_raise(current_table_state, this_player):
 		chosen_action_type = 'RAISE'
 		action_value = current_bet + np.random.uniform(min_raise, max_raise)
 
-	print(action_value)
 	ret_action = [chosen_action_type, action_value]
 
 	return ret_action
