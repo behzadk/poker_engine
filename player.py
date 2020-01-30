@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
-from treys import Card
-from treys import Deck
-from treys import Evaluator
+from deuces import Card
+from deuces import Deck
+from deuces import Evaluator
+import os
 
 class Player:
     def __init__(self, player_id, starting_stack, policy):
@@ -104,27 +105,55 @@ class Player:
     # Returns an action committed by a player.
     # actions are chosen from an action_policy script.
     ##
-    def get_action(self, table, table_state):
-        curent_bet = table_state['current_bet']
+    def get_action(self, table, table_state, round_actions):
+        curent_bet = table.current_bet
+
+        chosen_action = [self.id]
 
         if self.stack <= 0:
             self.all_in = True
-            chosen_action = ['ALL_IN', 0]
+            chosen_action += ['ALL_IN', 0]
 
         else:
-            chosen_action = self.policy(table_state, self)
+            chosen_action += self.policy(table_state, self, round_actions)
             
-            self.stack -= chosen_action[1]
+            self.stack -= chosen_action[2]
 
-
-            if chosen_action[0] == 'FOLD':
+            print(chosen_action)
+            if chosen_action[1] == 'FOLD':
                 self.active = False
 
         self.stage_actions.append(chosen_action)
         self.generate_action_data(table)
-        self.contribution_to_pot += chosen_action[1]
+        self.contribution_to_pot += chosen_action[2]
 
         return chosen_action
+
+
+    def display_game_state(self, table, round_actions):
+        evaluator = Evaluator()
+
+        if len(table.board) > 0:
+            p_score = evaluator.evaluate(table.board, self.hand)
+            p_class = evaluator.get_rank_class(p_score)
+            p_string = evaluator.class_to_string(p_class)
+
+        else:
+            p_string = ""
+
+        os.system('clear')
+        print(round_actions)
+        print("")
+        print("Pot: ", table.current_pot)
+        print("Board: ", end="")
+        Card.print_pretty_cards(table.board)
+        print("")
+        print("Your hand: ", end="")
+        Card.print_pretty_cards(self.hand)
+        print("%s \n" % (p_string))
+        print("Your stack: %d" % self.stack)
+        print("")
+        print("Current bet: ", table.current_bet)
 
 
     def write_actions_data(self):

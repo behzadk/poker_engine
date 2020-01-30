@@ -1,6 +1,6 @@
-from treys import Card
-from treys import Deck
-from treys import Evaluator
+from deuces import Card
+from deuces import Deck
+from deuces import Evaluator
 from global_constants import * 
 import pandas as pd
 
@@ -98,13 +98,13 @@ class Table:
                 table_state = self.generate_table_state()
 
                 if p.active:
-                    player_action = p.get_action(self, table_state)
-                    self.current_pot += player_action[1]
+                    player_action = p.get_action(self, self, round_actions)
+                    self.current_pot += player_action[2]
 
                     if player_action[1] != 0:
-                        self.current_bet = player_action[1]
+                        self.current_bet = player_action[2]
 
-                    if player_action[0] == "RAISE":
+                    if player_action[1] == "RAISE":
                         last_raiser = p
 
                     round_actions.append(player_action)
@@ -301,6 +301,7 @@ class Table:
             print(self.stage, "POT: ", self.current_pot)
             print("")
 
+        self.players[0].display_game_state(self, [])
         # Cleanup by allocating chips to winner
         self.redistribute_pot()
 

@@ -1,6 +1,6 @@
-from treys import Card
-from treys import Deck
-from treys import Evaluator
+from deuces import Card
+from deuces import Deck
+from deuces import Evaluator
 
 from itertools import cycle
 import numpy as np
@@ -19,7 +19,7 @@ def simulate_game():
     starting_stack = 10000
 
     p1 = Player("player_1", starting_stack, policy=action_policy.random_min_raise)
-    p2 = Player("player_2", starting_stack, policy=action_policy.random_min_raise)
+    p2 = Player("HUMAN", starting_stack, policy=action_policy.huamn_action)
     # p3 = Player("player_3", starting_stack, policy=action_policy.random_min_raise)
     # p4 = Player("player_4", starting_stack, policy=action_policy.random_min_raise)
 
