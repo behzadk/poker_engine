@@ -31,7 +31,6 @@ class Player:
         self.output_path = "./output/player_actions/player_" + str(self.id) + "_actions.csv"
 
 
-
     def init_actions_dataframe(self):
         columns = [
         "hand_idx", "pos_idx", "hand_num_1", "hand_suit_1", 
@@ -55,7 +54,6 @@ class Player:
 
 
     def generate_action_data(self, table):
-
         if self.stage_actions[-1][0] == "ALL_IN":
             return 0
 
@@ -119,7 +117,6 @@ class Player:
             
             self.stack -= chosen_action[2]
 
-            print(chosen_action)
             if chosen_action[1] == 'FOLD':
                 self.active = False
 
@@ -158,3 +155,4 @@ class Player:
 
     def write_actions_data(self):
         self.actions_df.to_csv(self.output_path)
+        self.actions_df = self.init_actions_dataframe()

@@ -19,7 +19,7 @@ class Table:
         self.stage = None
         self.big_blind = 20
         self.small_blind = 10
-        self.ante = 0
+        self.ante = 10
 
         self.deck = Deck()
         self.board = []
@@ -117,8 +117,6 @@ class Table:
 
         for p in self.get_active_players():
             p.hand_actions += stage_actions
-
-
 
         if debug == "SHOW_ACTIONS":
             print(stage_actions)
@@ -245,7 +243,7 @@ class Table:
             else:
                 p.active = True
 
-        self.players = [p for p in self.players if p.active]
+        # self.players = [p for p in self.players if p.active]
 
         # Remove player hole cards
         for p in self.players:
@@ -254,8 +252,6 @@ class Table:
             p.stage_actions = []
             p.hand_actions = []
             p.prev_stack = p.stack
-
-
 
         # Reset the deck
         self.deck = Deck()
@@ -301,7 +297,7 @@ class Table:
             print(self.stage, "POT: ", self.current_pot)
             print("")
 
-        self.players[0].display_game_state(self, [])
+        # self.players[0].display_game_state(self, [])
         # Cleanup by allocating chips to winner
         self.redistribute_pot()
 

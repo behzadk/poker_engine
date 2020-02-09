@@ -1,4 +1,6 @@
 import numpy as np
+from agent import Agent
+import encode_state
 
 ## Action format:
 # ['ACTION TYPE', int(value to transfer to pot)]
@@ -62,7 +64,7 @@ def always_raise(table, this_player, round_actions):
     current_bet = table.current_bet
     min_raise = table.big_blind
 
-    max_raise = this_player.stack - current_bet
+    max_raise = (this_player.stack - current_bet) * 0.25
 
     action_type_space = ['CALL', 'RAISE', 'CHECK', 'FOLD']
 
@@ -80,9 +82,8 @@ def always_raise(table, this_player, round_actions):
 
 
 def huamn_action(table, this_player, round_actions):
-    this_player.display_game_state(table, round_actions)
+    # this_player.display_game_state(table, round_actions)
     current_bet = table.current_bet
-
 
     action_type_space = ['CALL', 'RAISE', 'CHECK', 'FOLD']
 
@@ -97,7 +98,6 @@ def huamn_action(table, this_player, round_actions):
         action_type_space = ['CALL', 'RAISE', 'FOLD']
 
     while True:
-        print(action_type_space)
 
         # check if d1a is equal to one of the strings, specified in the list
         try:
@@ -107,8 +107,6 @@ def huamn_action(table, this_player, round_actions):
 
         except (IndexError, ValueError):
             print("invalid index, please choose again")
-
-
 
     # If call, value to transfer is current bet
     if chosen_action_type == 'CALL':
@@ -154,3 +152,61 @@ def huamn_action(table, this_player, round_actions):
     ret_action = [chosen_action_type, action_value]
 
     return ret_action
+
+
+class RlBot:
+    def __init__(self, training):
+        action_type_space = ['CALL', 'RAISE', 'CHECK/FOLD']
+        
+        self.agent = Agent(agent_name="first_bot", 
+            action_names=action_type_space, training=training, state_shape=[1,8],
+            render=False, use_logging=True)
+
+        self.start_episode_stack = 0
+    
+    def start_episode(self, init_stack):
+        self.start_episode_stack = init_stack
+
+    def get_action(self, table, this_player, round_actions):
+        current_bet = table.current_bet
+        min_raise = table.big_blind
+        max_raise = this_player.stack - current_bet
+
+        action_type_space = ['CALL', 'RAISE', 'CHECK/FOLD']
+
+        state = encode_state.encode_state_v1(table, this_player)
+
+        # Place holder for state
+
+        # Get action from agent
+        action_idx = self.agent.get_action(state)
+
+        chosen_action_type = action_type_space[action_idx]
+
+        if current_bet == 0:
+            if chosen_action_type == "CALL":
+                chosen_action_type = "CHECK"
+                action_value = 0
+
+            elif chosen_action_type == "CHECK/FOLD":
+                chosen_action_type = "CHECK"
+                action_value = 0
+
+            elif chosen_action_type == "RAISE":
+                chosen_action_type = "RAISE"
+                action_value = current_bet + np.random.uniform(min_raise, max_raise)
+
+        else:
+            if chosen_action_type == "CHECK/FOLD":
+                chosen_action_type = "FOLD"
+                action_value = 0
+
+            elif chosen_action_type == "CALL":
+                action_value = current_bet
+
+            elif chosen_action_type == "RAISE":
+                action_value = current_bet + np.random.uniform(min_raise, max_raise)
+
+        ret_action = [chosen_action_type, action_value]
+
+        return ret_action
