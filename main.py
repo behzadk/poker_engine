@@ -16,9 +16,9 @@ from global_constants import *
 
 
 def simulate_game():
-    starting_stack = 1000000
+    starting_stack = 10000
 
-    rl_bot_agent = action_policy.RlBot(training=False)
+    rl_bot_agent = action_policy.RlBot(training=True)
 
 
     p1 = Player("player_1", starting_stack, policy=action_policy.random_min_raise)
@@ -43,8 +43,8 @@ def simulate_game():
     games_played = 0
 
     hand_count = 0
-    while games_played < 50:
-    # for i in range(1, int(50)):
+    # while games_played < 50:
+    for i in range(1, int(1e12)):
         table.play_single_hand()
         table.prepare_next_hand()
         hand_number.append(hand_count)
@@ -61,9 +61,7 @@ def simulate_game():
         max_loss = -bot_stack_history[-2]
         normalised_bot_reward = 2 * (bot_change - max_loss) / (max_gain - max_loss) - 1
 
-
-        rl_bot_agent.agent.update_replay_memory(end_hand_reward=normalised_bot_reward)
-
+        # rl_bot_agent.agent.update_replay_memory(end_hand_reward=normalised_bot_reward)
 
         if len(table.get_active_players()) <= 1:
             print(games_played)

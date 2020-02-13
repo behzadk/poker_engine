@@ -159,10 +159,11 @@ class RlBot:
         action_type_space = ['CALL', 'RAISE', 'CHECK/FOLD']
         
         self.agent = Agent(agent_name="first_bot", 
-            action_names=action_type_space, training=training, state_shape=[1,8],
+            action_names=action_type_space, training=training, state_shape=[1,119],
             render=False, use_logging=True)
 
         self.start_episode_stack = 0
+        self.state_encoder = encode_state.StateEncoder()
     
     def start_episode(self, init_stack):
         self.start_episode_stack = init_stack
@@ -174,7 +175,7 @@ class RlBot:
 
         action_type_space = ['CALL', 'RAISE', 'CHECK/FOLD']
 
-        state = encode_state.encode_state_v1(table, this_player)
+        state = self.state_encoder.encode_state_v1(table, this_player)
 
         # Place holder for state
 
@@ -208,5 +209,4 @@ class RlBot:
                 action_value = current_bet + np.random.uniform(min_raise, max_raise)
 
         ret_action = [chosen_action_type, action_value]
-
         return ret_action

@@ -79,12 +79,12 @@ class NeuralNetwork:
         net = self.x
 
         # First fully-connected (aka. dense) layer.
-        net = tf.layers.dense(inputs=net, name='layer_fc1', units=h_layer_units,
+        net = tf.layers.dense(inputs=net, name='layer_fc1', units=num_actions,
                               kernel_initializer=init, activation=activation)
 
-        # First fully-connected (aka. dense) layer.
-        net = tf.layers.dense(inputs=net, name='layer_fc2', units=num_actions,
-                              kernel_initializer=init, activation=activation)
+        # # First fully-connected (aka. dense) layer.
+        # net = tf.layers.dense(inputs=net, name='layer_fc2', units=num_actions,
+        #                       kernel_initializer=init, activation=activation)
 
         
         # The output of the Neural Network is the estimated Q-values

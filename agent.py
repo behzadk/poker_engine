@@ -63,7 +63,7 @@ class Agent:
         # Initialise epsilon greedy
         self.epsilon_greedy = EpsilonGreedy(start_value=1.0,
                                             end_value=0.1,
-                                            num_iterations=10000,
+                                            num_iterations=1e6,
                                             num_actions=self.num_actions,
                                             epsilon_testing=0.01)
 
@@ -73,18 +73,18 @@ class Agent:
             # The learning-rate for the optimizer decreases linearly.
             self.learning_rate_control = LinearControlSignal(start_value=1e-3,
                                                              end_value=1e-5,
-                                                             num_iterations=10000)
+                                                             num_iterations=5e6)
 
             # The loss-limit is used to abort the optimization whenever the
             # mean batch-loss falls below this limit.
             self.loss_limit_control = LinearControlSignal(start_value=0.1,
                                                           end_value=0.015,
-                                                          num_iterations=10000)
+                                                          num_iterations=5e6)
 
             # The maximum number of epochs to perform during optimization.
             self.max_epochs_control = LinearControlSignal(start_value=5.0,
                                                           end_value=10.0,
-                                                          num_iterations=10000)
+                                                          num_iterations=5e6)
 
             # The fraction of the replay-memory to be used.
             # Early in the training, we want to optimize more frequently
@@ -94,7 +94,7 @@ class Agent:
             # diversity, otherwise the Neural Network will over-fit.
             self.replay_fraction = LinearControlSignal(start_value=0.1,
                                                        end_value=1.0,
-                                                       num_iterations=10000)
+                                                       num_iterations=5e6)
 
         else:
             # We set these objects to None when they will not be used.
@@ -106,7 +106,7 @@ class Agent:
         if self.training:
             # We only create the replay-memory when we are training the agent,
             # because it requires a lot of RAM.
-            self.replay_memory = ReplayMemory(size=10000, state_shape=self.state_shape,
+            self.replay_memory = ReplayMemory(size=200000, state_shape=self.state_shape,
                                               num_actions=self.num_actions)
         else:
             self.replay_memory = None
