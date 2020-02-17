@@ -3,3 +3,8 @@ __pycache__
 venv/
 venv
 checkpoints
+checkpoint_bvb_0
+checkpoint_bvb_1
+output/
+q_values_log.txt
+reward_values_log.txt

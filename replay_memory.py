@@ -48,7 +48,7 @@ class ReplayMemory:
         self.size = size
         self.discount_factor = discount_factor
 
-        # Number of states useed
+        # Number of states used
         self.num_used = 0
 
         # Threshold for choosing low and high estimator errors
@@ -95,17 +95,31 @@ class ReplayMemory:
 
 
         self.q_values_old[:] = self.q_values[:]
+        idx = 0
 
-        for i in reversed(range(self.num_used - 1)):
+        for i in reversed(range(self.num_used)):
             action = self.actions[i]
             reward = self.rewards[i]
 
-            action_value = reward + self.discount_factor * np.max(self.q_values[i + 1])
+            if idx == 0:
+                idx += 1
+                action_value = reward
+                episode_reward = reward
+
+            else:
+                if reward != 0:
+                    episode_reward = reward
+            
+                action_value = episode_reward
+
+            # action_value = reward + self.discount_factor * np.max(self.q_values[i + 1])
+
 
             # Error of Q value estimation by the neural network
             # The difference between the actual value of the action taken and the estimated value
             # of that action
             self.estimation_errors[i] = abs(action_value - self.q_values[i, action])
+            # print(self.estimation_errors[i])
 
 
     def prepare_sampling_prob(self, batch_size=128):
@@ -126,11 +140,9 @@ class ReplayMemory:
         # Get index of errors that are "low"
         low_errors = q_val_err < self.error_threshold
         self.idx_err_low = np.squeeze(np.where(low_errors))
-        print(low_errors)
 
         # Get index of errors that are "high"
         self.idx_err_high = np.squeeze(np.where(np.logical_not(low_errors)))
-        print(self.idx_err_high)
 
         # Probability of sampling Q-values with high estimation errors.
         # This is either set to the fraction of the replay-memory that

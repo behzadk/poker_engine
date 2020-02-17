@@ -98,7 +98,7 @@ class EpsilonGreedy:
         return epsilon
 
 
-    def get_action(self, q_values, iteration, training):
+    def get_action(self, q_values, iteration, training, valid_idxs):
         """
         Epsilon greedy policy to choose an action
 
@@ -112,9 +112,12 @@ class EpsilonGreedy:
 
         # Probability of choosing random action
         if np.random.random() < epsilon:
-            action = np.random.randint(low=0, high=self.num_actions)
+            action = np.random.choice(valid_idxs)
 
         else:
             action = np.argmax(q_values)
 
         return action, epsilon
+
+
+

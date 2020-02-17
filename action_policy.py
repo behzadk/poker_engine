@@ -155,12 +155,13 @@ def huamn_action(table, this_player, round_actions):
 
 
 class RlBot:
-    def __init__(self, training):
-        action_type_space = ['CALL', 'RAISE', 'CHECK/FOLD']
+    def __init__(self, agent_name, training, epsilon_testing, checkpoint_dir):
+        self.action_type_space = ['CALL', 'ALL_IN', 'CHECK', 
+        'FOLD', 'RAISE_1', 'RAISE_2', 'RAISE_4', 'RAISE_8']
         
-        self.agent = Agent(agent_name="first_bot", 
-            action_names=action_type_space, training=training, state_shape=[1,119],
-            render=False, use_logging=True)
+        self.agent = Agent(agent_name=agent_name, checkpoint_dir=checkpoint_dir, epsilon_testing=epsilon_testing,
+            action_names=self.action_type_space, training=training, state_shape=[1,121],
+            render=False, use_logging=False)
 
         self.start_episode_stack = 0
         self.state_encoder = encode_state.StateEncoder()
@@ -173,40 +174,49 @@ class RlBot:
         min_raise = table.big_blind
         max_raise = this_player.stack - current_bet
 
-        action_type_space = ['CALL', 'RAISE', 'CHECK/FOLD']
-
         state = self.state_encoder.encode_state_v1(table, this_player)
 
-        # Place holder for state
-
         # Get action from agent
-        action_idx = self.agent.get_action(state)
+        action_idx = self.agent.get_action(state, this_player, table)
 
-        chosen_action_type = action_type_space[action_idx]
+        chosen_action_type = self.action_type_space[action_idx]
 
-        if current_bet == 0:
-            if chosen_action_type == "CALL":
-                chosen_action_type = "CHECK"
-                action_value = 0
+        if chosen_action_type == "CALL":
+            action_value = current_bet
 
-            elif chosen_action_type == "CHECK/FOLD":
-                chosen_action_type = "CHECK"
-                action_value = 0
+        elif chosen_action_type == "ALL_IN":
+            action_value = this_player.stack
 
-            elif chosen_action_type == "RAISE":
-                chosen_action_type = "RAISE"
-                action_value = current_bet + np.random.uniform(min_raise, max_raise)
+        elif chosen_action_type == "CHECK" or chosen_action_type == "FOLD":
+            action_value = 0
+
+
+        elif chosen_action_type == "RAISE_1":
+            action_value = current_bet + table.big_blind
+            chosen_action_type = "RAISE"
+
+        elif chosen_action_type == "RAISE_2":
+            action_value = current_bet + table.big_blind * 2
+            chosen_action_type = "RAISE"
+
+        elif chosen_action_type == "RAISE_4":
+            action_value = current_bet + table.big_blind * 4
+            chosen_action_type = "RAISE"
+
+        elif chosen_action_type == "RAISE_8":
+            action_value = current_bet + table.big_blind * 8
+            chosen_action_type = "RAISE"
+
 
         else:
-            if chosen_action_type == "CHECK/FOLD":
-                chosen_action_type = "FOLD"
-                action_value = 0
-
-            elif chosen_action_type == "CALL":
-                action_value = current_bet
-
-            elif chosen_action_type == "RAISE":
-                action_value = current_bet + np.random.uniform(min_raise, max_raise)
+            print("invalid action, exiting...")
+            exit()
 
         ret_action = [chosen_action_type, action_value]
         return ret_action
+
+
+
+
+
+

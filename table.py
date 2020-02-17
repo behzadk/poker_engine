@@ -14,6 +14,8 @@ class Table:
 
         self.players = players_list
 
+        self.total_chips = sum([p.stack for p in self.players])
+
         self.d_chip_pos = 0
 
         self.stage = None
@@ -25,6 +27,8 @@ class Table:
         self.board = []
 
         self.reset_player_position_indexes()
+
+        self.eval = Evaluator()
 
     ##
     # Deals two cards to each player
@@ -55,9 +59,8 @@ class Table:
     # on the players current hand and board
     ##
     def evaluate_player_hands(self):
-        evaluator = Evaluator()
         for p in self.players:
-            p.evaluate_hand(self.board, evaluator)
+            p.evaluate_hand(self.board, self.eval)
 
     ##
     # Returns the stack of each player
@@ -95,13 +98,11 @@ class Table:
                     no_further_action = True
                     break
 
-                table_state = self.generate_table_state()
-
                 if p.active:
                     player_action = p.get_action(self, self, round_actions)
                     self.current_pot += player_action[2]
 
-                    if player_action[1] != 0:
+                    if player_action[2] != 0:
                         self.current_bet = player_action[2]
 
                     if player_action[1] == "RAISE":
@@ -133,7 +134,7 @@ class Table:
         # Take big blind
         self.players[1].stack -= self.big_blind
         self.current_pot += self.big_blind
-        self.players[0].contribution_to_pot += self.big_blind
+        self.players[1].contribution_to_pot += self.big_blind
 
         # Take ante
         for p in self.players:
@@ -147,14 +148,12 @@ class Table:
     # and the current board.
     ##
     def identify_winners(self, players):
-        player_hands = [p.hand for p in players]
-        evaluator = Evaluator()
-        
+        player_hands = [p.hand for p in players]        
         best_rank = 7463  # rank one worse than worst hand
         winners = []
 
         for p in players:
-            p_rank = evaluator.evaluate(p.hand, self.board)
+            p_rank = self.eval.evaluate(p.hand, self.board)
 
             if p_rank == best_rank:
                 winners.append(p)
@@ -191,11 +190,9 @@ class Table:
             if this_pot_val > 0:
                 pots.append([this_pot_val, this_pot_players])
 
-
         # For each pot compare the hands of active players to identify the winner
         active_players = self.get_active_players()
         active_player_hands = [p.hand for p in active_players]
-        evaluator = Evaluator()
         best_rank = 7463  # rank one worse than worst hand
 
         # For each pot compare the hands of active players to identify the winner
@@ -221,12 +218,11 @@ class Table:
                 winner.stack += distributed_pot_val
 
 
-
     ##
     # Resets the table and moves dealerchip to the left by one position.
     # 
     ##
-    def prepare_next_hand(self):
+    def prepare_next_hand(self, update_action_data=False):
         self.board = []
         self.current_pot = 0
 
@@ -234,6 +230,7 @@ class Table:
         player_0 = self.players[0]
         self.players.pop(0)
         self.players.append(player_0)
+        self.reset_player_position_indexes()
 
         # Set players with no stack to inactive
         for p in self.players:
@@ -247,7 +244,9 @@ class Table:
 
         # Remove player hole cards
         for p in self.players:
-            p.update_action_data_net_stack(self.hand_idx)
+            if update_action_data:
+                p.update_action_data_net_stack(self.hand_idx)
+                
             p.hand = None
             p.stage_actions = []
             p.hand_actions = []

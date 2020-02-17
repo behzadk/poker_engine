@@ -12,12 +12,16 @@ from epsilon_greedy import EpsilonGreedy
 from epsilon_greedy import LinearControlSignal
 from neural_network import NeuralNetwork
 from replay_memory import ReplayMemory
+
+from deuces import Card
+
 class Agent:
     """
     Agent class interacts with the game evironment and creates
     instances of replay memory and the neural network
     """
-    def __init__(self, agent_name, action_names, training, state_shape, render=False, use_logging=True):
+    def __init__(self, agent_name, action_names, training, epsilon_testing,
+        state_shape, checkpoint_dir, render=False, use_logging=False):
         """
         Create agent object instance. Will initialise the replay memory
         and neural network
@@ -30,7 +34,6 @@ class Agent:
             use_logging (bool): Whether to log to text files during training
 
         """
-
         self.agent_name = agent_name
 
         # The number of possible actions that the agent may take in every step.
@@ -63,9 +66,9 @@ class Agent:
         # Initialise epsilon greedy
         self.epsilon_greedy = EpsilonGreedy(start_value=1.0,
                                             end_value=0.1,
-                                            num_iterations=1e6,
+                                            num_iterations=1e5,
                                             num_actions=self.num_actions,
-                                            epsilon_testing=0.01)
+                                            epsilon_testing=epsilon_testing)
 
         if self.training:
             # The following control-signals are only used during training.
@@ -73,18 +76,18 @@ class Agent:
             # The learning-rate for the optimizer decreases linearly.
             self.learning_rate_control = LinearControlSignal(start_value=1e-3,
                                                              end_value=1e-5,
-                                                             num_iterations=5e6)
+                                                             num_iterations=1e5)
 
             # The loss-limit is used to abort the optimization whenever the
             # mean batch-loss falls below this limit.
             self.loss_limit_control = LinearControlSignal(start_value=0.1,
                                                           end_value=0.015,
-                                                          num_iterations=5e6)
+                                                          num_iterations=1e5)
 
             # The maximum number of epochs to perform during optimization.
             self.max_epochs_control = LinearControlSignal(start_value=5.0,
                                                           end_value=10.0,
-                                                          num_iterations=5e6)
+                                                          num_iterations=1e5)
 
             # The fraction of the replay-memory to be used.
             # Early in the training, we want to optimize more frequently
@@ -94,7 +97,7 @@ class Agent:
             # diversity, otherwise the Neural Network will over-fit.
             self.replay_fraction = LinearControlSignal(start_value=0.1,
                                                        end_value=1.0,
-                                                       num_iterations=5e6)
+                                                       num_iterations=1e5)
 
         else:
             # We set these objects to None when they will not be used.
@@ -106,14 +109,14 @@ class Agent:
         if self.training:
             # We only create the replay-memory when we are training the agent,
             # because it requires a lot of RAM.
-            self.replay_memory = ReplayMemory(size=200000, state_shape=self.state_shape,
+            self.replay_memory = ReplayMemory(size=10000, state_shape=self.state_shape,
                                               num_actions=self.num_actions)
         else:
             self.replay_memory = None
 
         # Create the Neural Network used for estimating Q-values.
-        self.model = NeuralNetwork(input_shape=self.state_shape, num_actions=self.num_actions, 
-            checkpoint_dir="./checkpoints/", replay_memory=self.replay_memory)
+        self.model = NeuralNetwork(model_name=agent_name, input_shape=self.state_shape, num_actions=self.num_actions, 
+            checkpoint_dir=checkpoint_dir, replay_memory=self.replay_memory, training=self.training)
 
         # Record episode states. In the case of poker,
         # a hand constitutes an episode.
@@ -137,21 +140,102 @@ class Agent:
         """Return the name of an action."""
         return self.action_names[action]
 
+    def q_value_processing(self, q_values, hero_player, table):
+        if table.current_bet == 0:
+            valid_idxs = [1, 2, 4, 5, 6, 7]
 
-    def get_action(self, state):
+            # Set fold Q-value to zero
+            q_values[0][3] = 0.0
+
+            # Set call Q-value to zero
+            q_values[0][0] = 0.0
+
+            # Change raise space
+            if table.current_bet + table.big_blind > hero_player.stack:
+                # Set all raise Q values to zero
+                q_values[0][4:] = 0.0
+                valid_idxs = [1, 2]
+
+
+            elif table.current_bet + table.big_blind*2 > hero_player.stack:
+                # Set 2x raise + Q values to zero
+                q_values[0][5:] = 0.0
+                valid_idxs = [1, 2, 4]
+
+            elif table.current_bet + table.big_blind*4 > hero_player.stack:
+                # Set  4x raise + raise Q values to zero
+                q_values[0][6:] = 0.0
+                valid_idxs = [1, 2, 4, 5]
+
+            elif table.current_bet + table.big_blind*8 > hero_player.stack:
+                # Set  8x raise +  raise Q values to zero
+                q_values[0][7:] = 0.0
+                valid_idxs = [1, 2, 4, 5, 6]
+
+            else:
+                valid_idxs = [1, 2, 4, 5, 6, 7]
+
+
+
+        ### Current bet above zero ###
+        else:
+            valid_idxs = [0, 1, 3, 4, 5, 6, 7]
+
+            # Set check Q-value to zero
+            q_values[0][2] = 0.0
+
+            # Remove call if can only go all in or fold
+            if table.current_bet > hero_player.stack:
+                q_values[0][0] = 0.0
+                q_values[0][4:] = 0.0
+                valid_idxs = [1, 3]
+
+            # Change raise space
+            elif table.current_bet + table.big_blind > hero_player.stack:
+                # Set all raise Q values to zero
+                q_values[0][4:] = 0.0
+                valid_idxs = [0, 1, 3]
+
+
+            elif table.current_bet + table.big_blind*2 > hero_player.stack:
+                # Set 2x raise + Q values to zero
+                q_values[0][5:] = 0.0
+                valid_idxs = [0, 1, 3, 4]
+
+            elif table.current_bet + table.big_blind*4 > hero_player.stack:
+                # Set  4x raise + raise Q values to zero
+                q_values[0][6:] = 0.0
+                valid_idxs = [0, 1, 3, 4, 5]
+
+            elif table.current_bet + table.big_blind*8 > hero_player.stack:
+                # Set  8x raise +  raise Q values to zero
+                q_values[0][7:] = 0.0
+                valid_idxs = [0, 1, 3, 4, 5, 6]
+
+            else:
+                valid_idxs = [0, 1, 3, 4, 5, 6, 7]
+
+
+        return q_values, valid_idxs
+
+
+    def get_action(self, state, hero_player, table):
         """
         Called by the game, requesting a response from the agent.
 
         """
         q_values = self.model.get_q_values(states=[1] + state)[0]
-        # print(q_values)
+        q_values, valid_idxs = self.q_value_processing(q_values, hero_player, table)
+
         count_states = self.model.get_count_states()
 
         # Determine the action that the agent must take in the game-environment.
         # The epsilon is just used for printing further below.
         action, epsilon = self.epsilon_greedy.get_action(q_values=q_values,
                                                          iteration=count_states,
-                                                         training=self.training)
+                                                         training=self.training,
+                                                         valid_idxs=valid_idxs)
+
         count_states = self.model.increase_count_states()
 
         self.episode_states.append(state)

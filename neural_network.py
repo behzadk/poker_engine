@@ -5,10 +5,10 @@ import os
 import time
 import csv
 import argparse
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+import tensorflow as tf
+# tf.disable_v2_behavior()
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 class NeuralNetwork:
     """
@@ -16,7 +16,7 @@ class NeuralNetwork:
     Provides an estimate of the Q-values given a current state.
     """
 
-    def __init__(self, input_shape, num_actions, replay_memory, checkpoint_dir):
+    def __init__(self, model_name, input_shape, num_actions, replay_memory, checkpoint_dir, training):
         """
         Args:
             n_inputs (int): Number of inputs
@@ -25,92 +25,102 @@ class NeuralNetwork:
         """
 
         # Optional parameters
-        h_layer_units = input_shape[1] #- input_shape[1]/2
+        self.graph = tf.Graph()
+        with self.graph.as_default():
+            h_layer_units = int(input_shape[1] - input_shape[1]/2)
+            self.model_name = model_name
+
+            # Make tensorflow variable names
+            name_q_values_new = model_name + "/q_values_new"
+            name_count_states = model_name + "/count_states"
+            name_count_episodes = model_name + "/count_episodes"
+            name_layer_fc1 = model_name + "/layer_fc1"
+            name_layer_fc2 = model_name + "/layer_fc2"
+
+            self.replay_memory = replay_memory
+            self.checkpoint_dir = checkpoint_dir
+            self.checkpoint_path = os.path.join(checkpoint_dir, "checkpoint")
+
+            # Placeholder variable for input state 
+            self.x = tf.placeholder(dtype=tf.float32, shape=[None] + input_shape, name='x')
+
+            # Placeholder for the learning rate.
+            self.learning_rate = tf.placeholder(dtype=tf.float32, shape=[])
+
+            # Placeholder variable for inputting the target Q-value that we want to estimate
+            self.q_values_new = tf.placeholder(tf.float32,
+                                               shape=[None, num_actions],
+                                               name=name_q_values_new)
+
+            # From Hvass:
+            # This is a hack that allows us to save/load the counter for
+            # the number of states processed in the game-environment.
+            # We will keep it as a variable in the TensorFlow-graph
+            # even though it will not actually be used by TensorFlow.
+            self.count_states = tf.Variable(initial_value=0,
+                                            trainable=False, dtype=tf.int64,
+                                            name=name_count_states)
 
 
-        self.replay_memory = replay_memory
-        self.checkpoint_dir = checkpoint_dir
-        self.checkpoint_path = os.path.join(checkpoint_dir, "checkpoint")
-
-        # Placeholder variable for input state 
-        self.x = tf.placeholder(dtype=tf.float32, shape=[None] + input_shape, name='x')
-
-        # Placeholder for the learning rate.
-        self.learning_rate = tf.placeholder(dtype=tf.float32, shape=[])
-
-        # Placeholder variable for inputting the target Q-value that we want to estimate
-        self.q_values_new = tf.placeholder(tf.float32,
-                                           shape=[None, num_actions],
-                                           name='q_values_new')
-
-        # From Hvass:
-        # This is a hack that allows us to save/load the counter for
-        # the number of states processed in the game-environment.
-        # We will keep it as a variable in the TensorFlow-graph
-        # even though it will not actually be used by TensorFlow.
-        self.count_states = tf.Variable(initial_value=0,
-                                        trainable=False, dtype=tf.int64,
-                                        name='count_states')
+            # Similarly, this is the counter for the number of episodes.
+            self.count_episodes = tf.Variable(initial_value=0,
+                                              trainable=False, dtype=tf.int64,
+                                              name=name_count_episodes)
 
 
-        # Similarly, this is the counter for the number of episodes.
-        self.count_episodes = tf.Variable(initial_value=0,
-                                          trainable=False, dtype=tf.int64,
-                                          name='count_episodes')
+            # TensorFlow operation for increasing count_states.
+            self.count_states_increase = tf.assign(self.count_states,
+                                                   self.count_states + 1)
 
 
-        # TensorFlow operation for increasing count_states.
-        self.count_states_increase = tf.assign(self.count_states,
-                                               self.count_states + 1)
+            # TensorFlow operation for increasing count_episodes.
+            self.count_episodes_increase = tf.assign(self.count_episodes,
+                                                     self.count_episodes + 1)
 
+            
+            # Neural network architechture
 
-        # TensorFlow operation for increasing count_episodes.
-        self.count_episodes_increase = tf.assign(self.count_episodes,
-                                                 self.count_episodes + 1)
+            # Initialise weights to be close to zero.
+            init = tf.truncated_normal_initializer(mean=0.0, stddev=2e-2)
 
-        
-        # Neural network architechture
+            activation = tf.nn.relu
 
-        # Initialise weights to be close to zero.
-        init = tf.truncated_normal_initializer(mean=0.0, stddev=1.0)
+            net = self.x
 
-        activation = tf.nn.relu
+            # First fully-connected (aka. dense) layer.
+            net = tf.layers.dense(inputs=net, name=name_layer_fc1, units=h_layer_units,
+                                  kernel_initializer=init, activation=activation)
 
-        net = self.x
+            # First fully-connected (aka. dense) layer.
+            net = tf.layers.dense(inputs=net, name=name_layer_fc2, units=num_actions,
+                                  kernel_initializer=init, activation=activation)
 
-        # First fully-connected (aka. dense) layer.
-        net = tf.layers.dense(inputs=net, name='layer_fc1', units=num_actions,
-                              kernel_initializer=init, activation=activation)
+            
+            # The output of the Neural Network is the estimated Q-values
+            # for each possible action in the game-environment.
+            # RMSPropOptimizer is adaptive stochastic gradient descent, Root mean squared (RMS).
+            self.q_values = net
 
-        # # First fully-connected (aka. dense) layer.
-        # net = tf.layers.dense(inputs=net, name='layer_fc2', units=num_actions,
-        #                       kernel_initializer=init, activation=activation)
+            # L2-loss is the difference between
+            squared_error = tf.square(self.q_values - self.q_values_new)
+            sum_squared_error = tf.reduce_sum(squared_error, axis=1)
+            self.loss = tf.reduce_mean(sum_squared_error)
 
-        
-        # The output of the Neural Network is the estimated Q-values
-        # for each possible action in the game-environment.
-        # RMSPropOptimizer is adaptive stochastic gradient descent, Root mean squared (RMS).
-        self.q_values = net
+            # Optimizer to minimise the loss function.
+            # learning rate is a placeholder defined earlier, because this needs
+            # to change dynamically as the optimization progresses
+            self.optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
 
-        # L2-loss is the difference between
-        squared_error = tf.square(self.q_values - self.q_values_new)
-        sum_squared_error = tf.reduce_sum(squared_error, axis=1)
-        self.loss = tf.reduce_mean(sum_squared_error)
+            # For saving checkpoints
+            # if training:
+            self.saver = tf.train.Saver()
 
-        # Optimizer to minimise the loss function.
-        # learning rate is a placeholder defined earlier, because this needs
-        # to change dynamically as the optimization progresses
-        self.optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
+            # Create a new TensorFlow session so we can run the Neural Network.
+            self.session = tf.Session(graph=self.graph)
 
-        # For saving checkpoints
-        self.saver = tf.train.Saver()
-
-        # Create a new TensorFlow session so we can run the Neural Network.
-        self.session = tf.Session()
-
-        # Load the most recent checkpoint if it exists,
-        # otherwise initialize all the variables in the TensorFlow graph.
-        self.load_checkpoint(checkpoint_dir)
+            # Load the most recent checkpoint if it exists,
+            # otherwise initialize all the variables in the TensorFlow graph.
+            self.load_checkpoint(checkpoint_dir)
 
 
     def close(self):
@@ -122,6 +132,7 @@ class NeuralNetwork:
         If checkpoint does not exist, variables are initialised
         from default parameters
         """
+
 
         try:
             print("Trying to restore last checkpoint ...")

@@ -114,7 +114,6 @@ class Player:
 
         else:
             chosen_action += self.policy(table_state, self, round_actions)
-            
             self.stack -= chosen_action[2]
 
             if chosen_action[1] == 'FOLD':
