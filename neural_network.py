@@ -27,7 +27,7 @@ class NeuralNetwork:
         # Optional parameters
         self.graph = tf.Graph()
         with self.graph.as_default():
-            h_layer_units = int(input_shape[1] - input_shape[1]/2)
+            h_layer_units = int(25)
             self.model_name = model_name
 
             # Make tensorflow variable names
@@ -36,6 +36,7 @@ class NeuralNetwork:
             name_count_episodes = model_name + "/count_episodes"
             name_layer_fc1 = model_name + "/layer_fc1"
             name_layer_fc2 = model_name + "/layer_fc2"
+            name_out_layer = model_name + "/layer_fc_out"
 
             self.replay_memory = replay_memory
             self.checkpoint_dir = checkpoint_dir
@@ -81,8 +82,7 @@ class NeuralNetwork:
             # Neural network architechture
 
             # Initialise weights to be close to zero.
-            init = tf.truncated_normal_initializer(mean=0.0, stddev=2e-2)
-
+            init = tf.truncated_normal_initializer(mean=0.00, stddev=0.001)
             activation = tf.nn.relu
 
             net = self.x
@@ -92,8 +92,17 @@ class NeuralNetwork:
                                   kernel_initializer=init, activation=activation)
 
             # First fully-connected (aka. dense) layer.
-            net = tf.layers.dense(inputs=net, name=name_layer_fc2, units=num_actions,
+            net = tf.layers.dense(inputs=net, name=name_layer_fc2, units=h_layer_units,
                                   kernel_initializer=init, activation=activation)
+
+
+            # Final fully-connected layer.
+            net = tf.layers.dense(inputs=net, name=name_out_layer, units=num_actions,
+                                  kernel_initializer=init, activation=None)
+
+            # # First fully-connected (aka. dense) layer.
+            # net = tf.layers.dense(inputs=net, name=name_layer_fc2, units=num_actions,
+            #                       kernel_initializer=init, activation=activation)
 
             
             # The output of the Neural Network is the estimated Q-values
@@ -105,11 +114,13 @@ class NeuralNetwork:
             squared_error = tf.square(self.q_values - self.q_values_new)
             sum_squared_error = tf.reduce_sum(squared_error, axis=1)
             self.loss = tf.reduce_mean(sum_squared_error)
+            # self.loss = tf.reduce_mean(tf.square(self.q_values - self.q_values_new))
 
             # Optimizer to minimise the loss function.
             # learning rate is a placeholder defined earlier, because this needs
             # to change dynamically as the optimization progresses
-            self.optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
+            # self.optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=0.0001).minimize(self.loss)
 
             # For saving checkpoints
             # if training:
@@ -132,7 +143,6 @@ class NeuralNetwork:
         If checkpoint does not exist, variables are initialised
         from default parameters
         """
-
 
         try:
             print("Trying to restore last checkpoint ...")
@@ -208,10 +218,14 @@ class NeuralNetwork:
         max_iterations = int(iterations_per_epoch * max_epochs)
 
         # Buffer for storing the loss-values of the most recent batches.
-        loss_history = np.zeros(100, dtype=float)
+        # loss_history = np.zeros(100, dtype=float)
+        loss_history = []
 
+        prev_loss_val = 1e5
 
-        for i in range(max_iterations):
+        i = 0
+        while True:
+        # for i in range(int(1e6)):
             # Randomly sample a batch of states and target Q-values
             # from the replay-memory. These are the Q-values that we
             # want the Neural Network to be able to estimate.
@@ -220,33 +234,47 @@ class NeuralNetwork:
             # Create a feed-dict for inputting the data to the TensorFlow graph.
             # Note that the learning-rate is also in this feed-dict.
             feed_dict = {self.x: state_batch,
-                         self.q_values_new: q_values_batch,
-                         self.learning_rate: learning_rate}
-
-            np.shape(feed_dict)
+                         self.q_values_new: q_values_batch}
 
             # Perform one optimization step and get the loss-value.
             loss_val, _ = self.session.run([self.loss, self.optimizer],
                                            feed_dict=feed_dict)
 
+
             # Shift the loss-history and assign the new value.
             # This causes the loss-history to only hold the most recent values.
-            loss_history = np.roll(loss_history, 1)
-            loss_history[0] = loss_val
+            # loss_history = np.roll(loss_history, 1)
+            # loss_history[0] = loss_val
+
+            loss_history.append(loss_val)
 
             # Calculate the average loss for the previous batches.
             loss_mean = np.mean(loss_history)
 
+
             # Print status.
             pct_epoch = i / iterations_per_epoch
-            msg = "\tIteration: {0} ({1:.2f} epoch), Batch loss: {2:.4f}, Mean loss: {3:.4f}"
-            msg = msg.format(i, pct_epoch, loss_val, loss_mean)
-            self.print_progress(msg)
+
+            if i % 10 == 0:
+                msg = "\tIteration: {0} ({1:.2f} epoch), Batch loss: {2:.4f}, Mean loss: {3:.4f}\n"
+                msg = msg.format(i, pct_epoch, loss_val, loss_mean)
+                with open(file="./net_train.txt", mode='a', buffering=1) as file:
+                    file.write(msg)
+                self.print_progress(msg)
+
+
+            if i > max_iterations and prev_loss_val < loss_mean:
+                break
+
+
+            prev_loss_val = loss_mean
+
 
             # Stop the optimization if we have performed the required number
             # of iterations and the loss-value is sufficiently low.
             if i > min_iterations and loss_mean < loss_limit:
                 break
+            i += 1
 
     def get_weights_variable(self, layer_name):
         """

@@ -137,6 +137,18 @@ class LogQValues(Log):
                                                           np.max(q_values),
                                                           np.std(q_values))
 
+
+
+        msg = "{0:.3f}\t{1:.3f}\t{2:.3f}\t{3:.3f}\t{4:.3f}\t{5:.3f}\t{6:.3f}\t{7:.3f}".format(
+            np.min(q_values[:, 0]),
+                                                          np.mean(q_values[:, 0]),
+                                                          np.max(q_values[:, 0]),
+                                                          np.std(q_values[:, 0]),
+                                                          np.min(q_values[:, 1]),
+                                                          np.mean(q_values[:, 1]),
+                                                          np.max(q_values[:, 1]),
+                                                          np.std(q_values[:, 1]))
+
         self._write(count_episodes=count_episodes,
                     count_states=count_states,
                     msg=msg)

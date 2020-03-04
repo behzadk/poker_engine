@@ -5,7 +5,7 @@ import os
 import time
 import csv
 import argparse
-
+import pickle
 
 class ReplayMemory:
     """
@@ -80,8 +80,14 @@ class ReplayMemory:
             self.q_values[i] = q_values
             self.actions[i] = action
 
+            # if action == 0:
+            #     print(reward)
+
             # Rewards clipped to prevent heavy weighting of outliers in training.
-            self.rewards[i] = np.clip(reward, self.reward_clippig_min_max[0], self.reward_clippig_min_max[1])
+            # self.rewards[i] = np.clip(reward, self.reward_clippig_min_max[0], self.reward_clippig_min_max[1])
+
+            self.rewards[i] = reward
+
 
 
     def update_all_q_values(self):
@@ -92,34 +98,26 @@ class ReplayMemory:
         We then use the newly aquired data to improve the Q-value estimates (backwards sweep).
 
         """
-
-
         self.q_values_old[:] = self.q_values[:]
         idx = 0
 
         for i in reversed(range(self.num_used)):
             action = self.actions[i]
-            reward = self.rewards[i]
+            reward = self.rewards[i]            
 
-            if idx == 0:
-                idx += 1
-                action_value = reward
-                episode_reward = reward
-
-            else:
-                if reward != 0:
-                    episode_reward = reward
-            
-                action_value = episode_reward
-
-            # action_value = reward + self.discount_factor * np.max(self.q_values[i + 1])
-
+            action_value = reward #self.discount_factor * np.max(self.q_values[i])
 
             # Error of Q value estimation by the neural network
             # The difference between the actual value of the action taken and the estimated value
             # of that action
             self.estimation_errors[i] = abs(action_value - self.q_values[i, action])
             # print(self.estimation_errors[i])
+
+            # print(action_value, self.q_values[i, action])
+
+            # print(abs(action_value - self.q_values[i, action]))
+
+            self.q_values[i, action] = action_value
 
 
     def prepare_sampling_prob(self, batch_size=128):
@@ -137,19 +135,26 @@ class ReplayMemory:
 
         q_val_err = self.estimation_errors[0:self.num_used]
 
-        # Get index of errors that are "low"
-        low_errors = q_val_err < self.error_threshold
-        self.idx_err_low = np.squeeze(np.where(low_errors))
+        rewards = self.rewards[0:self.num_used]
+
+        extreme_rewards = [True if (x < 0.3 or x > 0.6) else False for x in rewards ]
+        self.extreme_rewards_idxs = np.squeeze(np.where(extreme_rewards))
+
+        # # Get index of errors that are "low"
+        # low_errors = q_val_err < self.error_threshold
+        # self.idx_err_low = np.squeeze(np.where(low_errors))
 
         # Get index of errors that are "high"
-        self.idx_err_high = np.squeeze(np.where(np.logical_not(low_errors)))
+        self.idx_err_low = np.squeeze(np.where(np.logical_not(extreme_rewards)))
 
         # Probability of sampling Q-values with high estimation errors.
         # This is either set to the fraction of the replay-memory that
         # has high estimation errors - or it is set to 0.5. So at least
         # half of the batch has high estimation errors.
-        prob_err_hi = len(self.idx_err_high) / self.num_used
+        prob_err_hi = len(self.extreme_rewards_idxs) / self.num_used
+        print(prob_err_hi)
         prob_err_hi = max(prob_err_hi, 0.5)
+        prob_err_hi = 0.8
 
 
         # Number of samples in a batch that have high estimation errors.
@@ -178,17 +183,24 @@ class ReplayMemory:
         # print(self.size)
         # exit()
 
+
         idx_low = np.random.choice(self.idx_err_low, 
                                     size=self.num_samples_err_low, 
                                     replace=False)
 
         # Randomly sample idxs with high error Q-values from replay memory
-        idx_high = np.random.choice(self.idx_err_high, 
+        idx_high = np.random.choice(self.extreme_rewards_idxs, 
                                     size=self.num_samples_err_high, 
                                     replace=False)
 
         # Indexes to sample
         idx = np.concatenate((idx_low, idx_high))
+        
+        # # except:
+        # idx = np.random.choice(range(len(self.states)), 
+        #                         size=self.num_samples_err_high + self.num_samples_err_low, 
+        #                         replace=False)
+
 
         # Get the state and Q-value batch
         states_batch = self.states[idx]
@@ -198,7 +210,7 @@ class ReplayMemory:
 
 
     def reset(self):
-        """Reset the replay-memory so it is empty."""
+        """Reset the replay-memory by half so it is empty."""
         self.num_used = 0
 
 

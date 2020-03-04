@@ -159,9 +159,11 @@ class RlBot:
         self.action_type_space = ['CALL', 'ALL_IN', 'CHECK', 
         'FOLD', 'RAISE_1', 'RAISE_2', 'RAISE_4', 'RAISE_8']
         
+        self.action_type_space = ['FOLD', 'ALL_IN']
+
         self.agent = Agent(agent_name=agent_name, checkpoint_dir=checkpoint_dir, epsilon_testing=epsilon_testing,
-            action_names=self.action_type_space, training=training, state_shape=[1,121],
-            render=False, use_logging=False)
+            action_names=self.action_type_space, training=training, state_shape=[8,],
+            render=False, use_logging=True)
 
         self.start_episode_stack = 0
         self.state_encoder = encode_state.StateEncoder()
@@ -174,10 +176,11 @@ class RlBot:
         min_raise = table.big_blind
         max_raise = this_player.stack - current_bet
 
-        state = self.state_encoder.encode_state_v1(table, this_player)
+        # state = self.state_encoder.encode_state_v1(table, this_player)
+        state, fold_state = self.state_encoder.encode_state_simple(table, this_player)
 
         # Get action from agent
-        action_idx = self.agent.get_action(state, this_player, table)
+        action_idx = self.agent.get_action(this_player, table, state, fold_state)
 
         chosen_action_type = self.action_type_space[action_idx]
 
@@ -186,6 +189,9 @@ class RlBot:
 
         elif chosen_action_type == "ALL_IN":
             action_value = this_player.stack
+
+            if action_value > current_bet:
+                chosen_action_type = "RAISE"
 
         elif chosen_action_type == "CHECK" or chosen_action_type == "FOLD":
             action_value = 0

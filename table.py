@@ -19,9 +19,9 @@ class Table:
         self.d_chip_pos = 0
 
         self.stage = None
-        self.big_blind = 20
-        self.small_blind = 10
-        self.ante = 10
+        self.big_blind = 200
+        self.small_blind = 100
+        self.ante = 100
 
         self.deck = Deck()
         self.board = []
@@ -98,18 +98,24 @@ class Table:
                     no_further_action = True
                     break
 
+                if len(self.get_active_players()) == 1:
+                    no_further_action = True
+                    break
+
+                if p.all_in:
+                    continue
+
                 if p.active:
                     player_action = p.get_action(self, self, round_actions)
                     self.current_pot += player_action[2]
 
-                    if player_action[2] != 0:
+                    if player_action[2] > self.current_bet:
                         self.current_bet = player_action[2]
 
                     if player_action[1] == "RAISE":
                         last_raiser = p
 
                     round_actions.append(player_action)
-
 
             stage_actions.append(round_actions)
 
@@ -120,7 +126,10 @@ class Table:
             p.hand_actions += stage_actions
 
         if debug == "SHOW_ACTIONS":
-            print(stage_actions)
+            if len(stage_actions) > 2:
+                print(stage_actions)
+                print(len(stage_actions))
+                exit()
 
 
     def take_blinds_and_ante(self):
@@ -251,6 +260,7 @@ class Table:
             p.stage_actions = []
             p.hand_actions = []
             p.prev_stack = p.stack
+            p.all_in = False
 
         # Reset the deck
         self.deck = Deck()

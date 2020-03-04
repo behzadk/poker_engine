@@ -109,7 +109,7 @@ class Player:
         chosen_action = [self.id]
 
         if self.stack <= 0:
-            self.all_in = True
+            # self.all_in = True
             chosen_action += ['ALL_IN', 0]
 
         else:
@@ -118,6 +118,9 @@ class Player:
 
             if chosen_action[1] == 'FOLD':
                 self.active = False
+
+        if self.stack <= 0:
+            self.all_in = True
 
         self.stage_actions.append(chosen_action)
         self.generate_action_data(table)
@@ -155,3 +158,6 @@ class Player:
     def write_actions_data(self):
         self.actions_df.to_csv(self.output_path)
         self.actions_df = self.init_actions_dataframe()
+
+
+        

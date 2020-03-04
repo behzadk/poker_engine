@@ -13,13 +13,13 @@ from table import Table
 from global_constants import * 
 
 def bot_battle(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name_agent_1):
-    starting_stack = 100000
+    starting_stack = 10000
 
     print("Loading ", checkpoint_dir_0)
     policy_0 = action_policy.RlBot(agent_name=name_agent_0, training=False, epsilon_testing=1.0, checkpoint_dir=checkpoint_dir_0)
     print("")
     print("Loading ", checkpoint_dir_1)
-    policy_1 = action_policy.RlBot(agent_name=name_agent_1, training=False, epsilon_testing=0.001, checkpoint_dir=checkpoint_dir_1)
+    policy_1 = action_policy.RlBot(agent_name=name_agent_1, training=False, epsilon_testing=0.0, checkpoint_dir=checkpoint_dir_1)
 
     player_0 = Player("p0", starting_stack, policy=policy_0.get_action)
     player_1 = Player("p1", starting_stack, policy=policy_1.get_action)
@@ -33,7 +33,7 @@ def bot_battle(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name_agent_1):
     player_0_wins = 0
     player_1_wins = 0
 
-    while games_played < 50:
+    while games_played < 1000:
         table.play_single_hand()
         table.prepare_next_hand()
         hand_count += 1
@@ -46,8 +46,10 @@ def bot_battle(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name_agent_1):
             
             else:
                 player_1_wins += 1
-
+                
+            games_played += 1
             print("GAMES PLYD: ", games_played, " P0 WINS: ", player_0_wins, " P1 WINS: ", player_1_wins)
+            print(player_1_wins / games_played)
 
             player_0.stack = starting_stack
             player_1.stack = starting_stack
@@ -58,22 +60,21 @@ def bot_battle(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name_agent_1):
             player_0.active = True
             player_1.active = True
 
-            games_played += 1
             table.prepare_next_hand()
 
             for p in players_list:
                 p.write_actions_data()
 
 def train_bot_vs_bot():
-    starting_stack = 100000
-    x = np.arange(0, 1.1, 0.01)
-    y = []
+    starting_stack = 10000
+    # x = np.arange(0, 1.1, 0.01)
+    # y = []
 
-    n=7
-    norm_reward_hill = lambda x, k: x**n / (k**n + x**n)
+    n=2
+    norm_reward_hill = lambda x, k: x**n / (k**n + x**n + 1e-12)
 
-    p0_policy = action_policy.RlBot(agent_name="bvb_0", training=True, epsilon_testing=0.01, checkpoint_dir="./checkpoint_bvb_0")
-    p1_policy = action_policy.RlBot(agent_name="bvb_1", training=True, epsilon_testing=0.01, checkpoint_dir="./checkpoint_bvb_1")
+    p0_policy = action_policy.RlBot(agent_name="bvb_0", training=True, epsilon_testing=0.1, checkpoint_dir="./checkpoint_bvb_0")
+    p1_policy = action_policy.RlBot(agent_name="bvb_1", training=True, epsilon_testing=0.1, checkpoint_dir="./checkpoint_bvb_1")
 
     p0_bot = Player("p0_bot", starting_stack, policy=p0_policy.get_action)
     p1_bot = Player("p1_bot", starting_stack, policy=p1_policy.get_action)
@@ -89,9 +90,8 @@ def train_bot_vs_bot():
     hand_count = 0
     games_played = 0
 
-
-
     for i in range(1, int(1e12)):
+        # print("")
         table.play_single_hand()
         table.prepare_next_hand()
         # print(hand_count)
@@ -109,37 +109,25 @@ def train_bot_vs_bot():
         max_gain = p0_stack_history[-2]
         max_loss = -p0_stack_history[-2]
         p0_stack_change = p0_stack_history[-1] - p0_stack_history[-2]
-        p0_stack_change = np.clip(p0_stack_change, 0,a_max=None)
-        normalised_p0_reward = (p0_stack_change - max_loss) / (max_gain - max_loss) + 0.000001
-        normalised_p0_reward = (normalised_p0_reward - 0.5) / (1 - 0.5)
-        # normalised_p0_reward = norm_reward_hill(p0_stack_change, 0)
+        # p0_stack_change = np.clip(p0_stack_change, 0,a_max=None)
+        normalised_p0_reward = ( p0_stack_change - max_loss) / (max_gain - max_loss)
+        normalised_p0_reward = norm_reward_hill(normalised_p0_reward, 0.5)
+        # print(p0_stack_change, normalised_p0_reward)
         # print(normalised_p0_reward)
-        # print(normalised_p1_reward)
         p0_policy.agent.update_replay_memory(end_hand_reward=normalised_p0_reward)
 
-        # if normalised_p0_reward > 1 or normalised_p0_reward < -1:
-        #     print("")
-        #     print(max_gain, max_loss)
-        #     print(p0_stack_change)
-        #     print(normalised_p0_reward)
-        #     for p in players_list:
-        #         p.write_actions_data()
 
-        #     exit()
-        #     print("")
-        
         max_gain = p1_stack_history[-2]
         max_loss = -p1_stack_history[-2]
-
         p1_stack_change = p1_stack_history[-1] - p1_stack_history[-2]
-        p1_stack_change = np.clip(p1_stack_change, 0,a_max=None)
-        normalised_p1_reward = (p1_stack_change - max_loss) / (max_gain - max_loss) + 0.000001
-        normalised_p1_reward = (normalised_p1_reward - 0.5) / (1 - 0.5)
 
+        normalised_p1_reward = ( p1_stack_change - max_loss) / (max_gain - max_loss)
+        normalised_p1_reward = norm_reward_hill(normalised_p1_reward, 0.5)
         p1_policy.agent.update_replay_memory(end_hand_reward=normalised_p1_reward)
         
         if len(table.get_active_players()) <= 1:
-            # print(games_played, hand_count)
+            if (hand_count % 100) == 0:
+                print(games_played, hand_count)
 
             p0_bot.stack = starting_stack
             p1_bot.stack = starting_stack
@@ -245,8 +233,6 @@ def simulate_game():
     # plt.show()
 
 
-
-
 def main():
     checkpoint_dir_0 = "./checkpoint_bvb_0"
     name_agent_0 = "bvb_0"
@@ -264,13 +250,11 @@ def main():
     p1_hand = deck.draw(2)
     eval = Evaluator()
     x = eval.evaluate(p1_hand, [])
-    print(x)
-    print(p1_hand)
+
     p2_hand = deck.draw(2)
 
     board = deck.draw(5)
     board = deck.draw(5)
-
 
     hands = [p1_hand, p2_hand]
 
@@ -292,7 +276,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # train_bot_vs_bot()
+    train_bot_vs_bot()
 
 
 

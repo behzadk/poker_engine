@@ -14,14 +14,13 @@ from neural_network import NeuralNetwork
 from replay_memory import ReplayMemory
 
 from deuces import Card
-
 class Agent:
     """
     Agent class interacts with the game evironment and creates
     instances of replay memory and the neural network
     """
     def __init__(self, agent_name, action_names, training, epsilon_testing,
-        state_shape, checkpoint_dir, render=False, use_logging=False):
+        state_shape, checkpoint_dir, render=False, use_logging=True):
         """
         Create agent object instance. Will initialise the replay memory
         and neural network
@@ -66,7 +65,7 @@ class Agent:
         # Initialise epsilon greedy
         self.epsilon_greedy = EpsilonGreedy(start_value=1.0,
                                             end_value=0.1,
-                                            num_iterations=1e5,
+                                            num_iterations=800000,
                                             num_actions=self.num_actions,
                                             epsilon_testing=epsilon_testing)
 
@@ -74,20 +73,20 @@ class Agent:
             # The following control-signals are only used during training.
 
             # The learning-rate for the optimizer decreases linearly.
-            self.learning_rate_control = LinearControlSignal(start_value=1e-3,
-                                                             end_value=1e-5,
-                                                             num_iterations=1e5)
+            self.learning_rate_control = LinearControlSignal(start_value=0.001,
+                                                             end_value=0.001,
+                                                             num_iterations=800000)
 
             # The loss-limit is used to abort the optimization whenever the
             # mean batch-loss falls below this limit.
-            self.loss_limit_control = LinearControlSignal(start_value=0.1,
-                                                          end_value=0.015,
-                                                          num_iterations=1e5)
+            self.loss_limit_control = LinearControlSignal(start_value=0.03,
+                                                          end_value=0.01,
+                                                          num_iterations=800000)
 
             # The maximum number of epochs to perform during optimization.
-            self.max_epochs_control = LinearControlSignal(start_value=5.0,
-                                                          end_value=10.0,
-                                                          num_iterations=1e5)
+            self.max_epochs_control = LinearControlSignal(start_value=10.0,
+                                                          end_value=30.0,
+                                                          num_iterations=800000)
 
             # The fraction of the replay-memory to be used.
             # Early in the training, we want to optimize more frequently
@@ -95,9 +94,9 @@ class Agent:
             # are learned and updated more often. Later in the training,
             # we need more samples in the replay-memory to have sufficient
             # diversity, otherwise the Neural Network will over-fit.
-            self.replay_fraction = LinearControlSignal(start_value=0.1,
+            self.replay_fraction = LinearControlSignal(start_value=0.8,
                                                        end_value=1.0,
-                                                       num_iterations=1e5)
+                                                       num_iterations=800000)
 
         else:
             # We set these objects to None when they will not be used.
@@ -109,7 +108,7 @@ class Agent:
         if self.training:
             # We only create the replay-memory when we are training the agent,
             # because it requires a lot of RAM.
-            self.replay_memory = ReplayMemory(size=10000, state_shape=self.state_shape,
+            self.replay_memory = ReplayMemory(size=1000, state_shape=self.state_shape,
                                               num_actions=self.num_actions)
         else:
             self.replay_memory = None
@@ -219,13 +218,21 @@ class Agent:
         return q_values, valid_idxs
 
 
-    def get_action(self, state, hero_player, table):
+    def get_action(self, hero_player, table, state, fold_state):
         """
         Called by the game, requesting a response from the agent.
 
         """
-        q_values = self.model.get_q_values(states=[1] + state)[0]
-        q_values, valid_idxs = self.q_value_processing(q_values, hero_player, table)
+        q_values = self.model.get_q_values(states=state)[0]
+        fold_q_values = self.model.get_q_values(states=fold_state)[0][0]
+
+        q_values[0] = fold_q_values
+
+
+            # exit()
+
+        # q_values, valid_idxs = self.q_value_processing(q_values, hero_player, table)
+        valid_idxs = [0, 1]
 
         count_states = self.model.get_count_states()
 
@@ -235,14 +242,25 @@ class Agent:
                                                          iteration=count_states,
                                                          training=self.training,
                                                          valid_idxs=valid_idxs)
+        if self.agent_name == "bvb_0":
+            print(state[0][1:3][0] * 13, state[0][1:3][1] * 13)
+            print(q_values)
+            print(action)
+            print("")
 
         count_states = self.model.increase_count_states()
 
-        self.episode_states.append(state)
+
+        if action == 0:
+            self.episode_states.append(fold_state)
+
+        else:
+            self.episode_states.append(state)
+
         self.episode_q_values.append(q_values)
         self.episode_actions.append(action)
-        self.episode_rewards.append(0.0)
         self.episode_epsilons.append(epsilon)
+
 
         return action
 
@@ -268,19 +286,23 @@ class Agent:
 
                 count_states = self.model.increase_count_states()
 
-                self.episode_rewards[-1] = end_hand_reward
 
                 # Add the state of the game-environment to the replay-memory.
                 self.replay_memory.add(state=self.episode_states[x],
                                        q_values=self.episode_q_values[x],
                                        action=self.episode_actions[x],
-                                       reward=self.episode_rewards[x],
+                                       reward=end_hand_reward,
                                        end_episode=end_episode)
 
             # How much of the replay-memory should be used.
             count_states = self.model.get_count_states()
             use_fraction = self.replay_fraction.get_value(iteration=count_states)
+
+            # print(use_fraction)
+            # print(self.replay_memory.used_fraction())
+            # print("")
             
+
             # When the replay-memory is sufficiently full.
             if self.replay_memory.is_full() \
                 or self.replay_memory.used_fraction() > use_fraction:
@@ -321,11 +343,12 @@ class Agent:
                     msg = "{0:4}:{1}\t Epsilon: {2:4.2f}\t Reward: {3:.1f}\t Episode Mean: {4:.1f}"
                     print(msg.format(count_episodes, count_states, self.episode_epsilons[-1],
                                      end_hand_reward, episode_mean))
-            if self.use_logging:
-                self.log_reward.write(count_episodes=count_episodes,
-                                      count_states=count_states,
-                                      reward_episode=end_hand_reward,
-                                      reward_mean=end_hand_reward)
+                    print(self.replay_fraction.get_value(iteration=count_states))
+            # if self.use_logging:
+            #     self.log_reward.write(count_episodes=count_episodes,
+            #                           count_states=count_states,
+            #                           reward_episode=end_hand_reward,
+            #                           reward_mean=end_hand_reward)
 
 
             count_states = self.model.get_count_states()

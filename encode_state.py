@@ -50,6 +50,9 @@ class StateEncoder:
 			card_0_suit = Card.get_suit_int(x)
 			state_arrays.append(self.get_card_dummies(card_0_rank, card_0_suit))
 
+		state = np.concatenate([state_arrays], axis=1).reshape(1, 1, -1)
+		return state
+
 
 		# Put in  dummy variables for undealt cards
 		table_card_ranks = self.table_card_ranks[:]
@@ -71,14 +74,48 @@ class StateEncoder:
 
 		state = np.concatenate([state_arrays, bet_and_stack], axis=1).reshape(1, 1, -1)
 
-
 		return state
 
 
+	def encode_state_simple(self, table, hero_player):
+		state_arrays = [1]
 
+		for x in hero_player.hand:
+			card_0_rank = (float(Card.get_rank_int(x)) + 1) / 13
+			state_arrays.append(card_0_rank)
+
+		if Card.get_suit_int(hero_player.hand[0]) == Card.get_suit_int(hero_player.hand[1]):
+			is_suited = 1
+
+		else:
+			is_suited = 0
+
+		state_arrays.append(is_suited)
+
+		card_connectivity = abs(Card.get_rank_int(hero_player.hand[0]) - Card.get_rank_int(hero_player.hand[1])) ** 0.25
+		state_arrays.append(card_connectivity)
+
+		# state = np.concatenate([state_arrays], axis=1).reshape(1, 1, -1)
+		state_arrays = np.array(state_arrays).reshape(1, -1)
+
+		bet_and_stack = []
+		bet_and_stack.append(np.array(table.current_pot/hero_player.prev_stack).reshape(1, -1))
+		bet_and_stack.append(np.array(hero_player.stack/hero_player.prev_stack).reshape(1, -1))
+		bet_and_stack.append(np.array(hero_player.playing_position).reshape(1, -1))
+
+
+		bet_and_stack = np.concatenate(bet_and_stack, axis=1)
+
+		state = np.concatenate([state_arrays, bet_and_stack], axis=1).reshape(1, -1)
+
+		fold_state = np.copy(state)
+		fold_state[0][0:7] = 0.0
+
+		return state, fold_state
 
 
 if __name__ == "__main__":
 	state_encoder()
-
 	# encode_state_v1(0, 1)
+
+
