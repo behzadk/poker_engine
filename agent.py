@@ -65,7 +65,7 @@ class Agent:
         # Initialise epsilon greedy
         self.epsilon_greedy = EpsilonGreedy(start_value=1.0,
                                             end_value=0.1,
-                                            num_iterations=800000,
+                                            num_iterations=1e6,
                                             num_actions=self.num_actions,
                                             epsilon_testing=epsilon_testing)
 
@@ -84,8 +84,8 @@ class Agent:
                                                           num_iterations=800000)
 
             # The maximum number of epochs to perform during optimization.
-            self.max_epochs_control = LinearControlSignal(start_value=10.0,
-                                                          end_value=30.0,
+            self.max_epochs_control = LinearControlSignal(start_value=300.0,
+                                                          end_value=300.0,
                                                           num_iterations=800000)
 
             # The fraction of the replay-memory to be used.
@@ -108,7 +108,7 @@ class Agent:
         if self.training:
             # We only create the replay-memory when we are training the agent,
             # because it requires a lot of RAM.
-            self.replay_memory = ReplayMemory(size=1000, state_shape=self.state_shape,
+            self.replay_memory = ReplayMemory(size=8000, state_shape=self.state_shape,
                                               num_actions=self.num_actions)
         else:
             self.replay_memory = None
@@ -242,7 +242,8 @@ class Agent:
                                                          iteration=count_states,
                                                          training=self.training,
                                                          valid_idxs=valid_idxs)
-        if self.agent_name == "bvb_0":
+
+        if self.agent_name == "bvb_1":
             print(state[0][1:3][0] * 13, state[0][1:3][1] * 13)
             print(q_values)
             print(action)

@@ -120,7 +120,7 @@ class NeuralNetwork:
             # learning rate is a placeholder defined earlier, because this needs
             # to change dynamically as the optimization progresses
             # self.optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
-            self.optimizer = tf.train.AdamOptimizer(learning_rate=0.0001).minimize(self.loss)
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=0.00001).minimize(self.loss)
 
             # For saving checkpoints
             # if training:
@@ -195,7 +195,7 @@ class NeuralNetwork:
 
 
     def optimize(self, min_epochs=1.0, max_epochs=10, 
-        batch_size=128, loss_limit=0.0015, learning_rate=1e-3):
+        batch_size=3000, loss_limit=0.0015, learning_rate=1e-3):
         """
         Optimize nn by sampling states and Q-values from the replay memory.
         """
@@ -270,10 +270,10 @@ class NeuralNetwork:
             prev_loss_val = loss_mean
 
 
-            # Stop the optimization if we have performed the required number
-            # of iterations and the loss-value is sufficiently low.
-            if i > min_iterations and loss_mean < loss_limit:
-                break
+            # # Stop the optimization if we have performed the required number
+            # # of iterations and the loss-value is sufficiently low.
+            # if i > min_iterations and loss_mean < loss_limit:
+            #     break
             i += 1
 
     def get_weights_variable(self, layer_name):

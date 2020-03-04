@@ -184,22 +184,22 @@ class ReplayMemory:
         # exit()
 
 
-        idx_low = np.random.choice(self.idx_err_low, 
-                                    size=self.num_samples_err_low, 
-                                    replace=False)
+        # idx_low = np.random.choice(self.idx_err_low, 
+        #                             size=self.num_samples_err_low, 
+        #                             replace=False)
 
-        # Randomly sample idxs with high error Q-values from replay memory
-        idx_high = np.random.choice(self.extreme_rewards_idxs, 
-                                    size=self.num_samples_err_high, 
-                                    replace=False)
+        # # Randomly sample idxs with high error Q-values from replay memory
+        # idx_high = np.random.choice(self.extreme_rewards_idxs, 
+        #                             size=self.num_samples_err_high, 
+        #                             replace=False)
 
-        # Indexes to sample
-        idx = np.concatenate((idx_low, idx_high))
+        # # Indexes to sample
+        # idx = np.concatenate((idx_low, idx_high))
         
         # # except:
-        # idx = np.random.choice(range(len(self.states)), 
-        #                         size=self.num_samples_err_high + self.num_samples_err_low, 
-        #                         replace=False)
+        idx = np.random.choice(range(len(self.states)), 
+                                size=self.num_samples_err_high + self.num_samples_err_low, 
+                                replace=False)
 
 
         # Get the state and Q-value batch
