@@ -4,12 +4,14 @@ from deuces import Card
 from deuces import Deck
 from deuces import Evaluator
 import os
+import csv
 
 class Player:
     def __init__(self, player_id, starting_stack, policy):
         self.id = player_id
         self.hand = None
         self.hand_actions = []
+        self.hand_action_count = 0
         self.active = True
 
         self.stack = starting_stack
@@ -96,7 +98,7 @@ class Player:
 
 
     def update_action_data_net_stack(self, hand_idx):
-        net_stack = self.stack - self.prev_stack
+        # net_stack = self.stack - self.prev_stack
         self.actions_df.loc[self.actions_df['hand_idx'] == hand_idx, "net_stack"] = net_stack
 
     ##
@@ -113,8 +115,10 @@ class Player:
             chosen_action += ['ALL_IN', 0]
 
         else:
-            chosen_action += self.policy(table_state, self, round_actions)
+            action, state, fold_state = self.policy(table_state, self, round_actions)
+            chosen_action += action
             self.stack -= chosen_action[2]
+            self.hand_action_count += 1
 
             if chosen_action[1] == 'FOLD':
                 self.active = False
@@ -123,8 +127,9 @@ class Player:
             self.all_in = True
 
         self.stage_actions.append(chosen_action)
-        self.generate_action_data(table)
         self.contribution_to_pot += chosen_action[2]
+
+        
 
         return chosen_action
 

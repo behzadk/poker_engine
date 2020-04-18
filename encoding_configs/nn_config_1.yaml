@@ -1,0 +1,4 @@
+
+layers: [250, 250, 250]
+huber_delta: 1.5
+learning_rate: 0.01

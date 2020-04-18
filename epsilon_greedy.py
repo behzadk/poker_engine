@@ -65,7 +65,7 @@ class EpsilonGreedy:
     """
 
     def __init__(self, num_actions, epsilon_testing=0.05,
-        num_iterations=1e6, start_value=1.0, end_value=0.1, repeat=False):
+        num_iterations=1e6, start_value=1.0, end_value=0.1, repeat=True):
         """
         Args:
             num_actions (int): Number of possible actions in game environment
@@ -81,14 +81,12 @@ class EpsilonGreedy:
         self.epsilon_linear = LinearControlSignal(num_iterations=num_iterations,  start_value=start_value, 
                                                 end_value=end_value, repeat=repeat)
 
-
     def get_epsilon(self, iteration, training):
         """
         Args:
             iteration (int): Counter for number of states we have iterated.
             training (bool): Boolean for if training.
         """
-
         if training:
             epsilon = self.epsilon_linear.get_value(iteration=iteration)
 
@@ -107,8 +105,14 @@ class EpsilonGreedy:
             iteration (int): Counter for number of states we have iterated.
             training (bool): Boolean for if training.
         """
-
         epsilon = self.get_epsilon(iteration=iteration, training=training)
+        
+        try:
+            epsilon = epsilon.read_value()
+
+        except AttributeError:
+            pass
+
 
         # Probability of choosing random action
         if np.random.random() < epsilon:

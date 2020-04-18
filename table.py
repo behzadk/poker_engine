@@ -8,7 +8,6 @@ class Table:
     def __init__(self, players_list):
         self.hand_idx = 0
 
-        self.current_stage = 'PREFLOP'
         self.current_pot = 0
         self.current_bet = 0
 
@@ -93,6 +92,14 @@ class Table:
         while no_further_action is False:
             round_actions = []
 
+            no_further_action = False
+            for p in self.get_active_players():
+                if p.all_in:
+                    no_further_action = True
+
+            if no_further_action:
+                continue
+
             for p in self.get_active_players():
                 if p == last_raiser:
                     no_further_action = True
@@ -172,7 +179,6 @@ class Table:
                 winners = [p]
 
         return winners
-
     
     def redistribute_pot(self):
         # Sort players by their contribution to the pot
@@ -201,8 +207,6 @@ class Table:
 
         # For each pot compare the hands of active players to identify the winner
         active_players = self.get_active_players()
-        active_player_hands = [p.hand for p in active_players]
-        best_rank = 7463  # rank one worse than worst hand
 
         # For each pot compare the hands of active players to identify the winner
         for pot in pots:
@@ -261,6 +265,7 @@ class Table:
             p.hand_actions = []
             p.prev_stack = p.stack
             p.all_in = False
+            # p.hand_action_count = 0
 
         # Reset the deck
         self.deck = Deck()

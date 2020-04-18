@@ -1,0 +1,4 @@
+n_hidden_layers: 2
+n_hl_size: 200
+huber_loss_delta: 1.5
+learning_rate: 0.01

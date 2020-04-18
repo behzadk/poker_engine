@@ -1,0 +1,13 @@
+# Encoding config
+make_hand_rank_dummies: False
+make_hand_suit_dummies: False
+make_board_rank_dummies: False
+make_board_suit_dummies: False
+make_stage_dummies: False
+make_score: False
+make_hero_position: False
+make_stack_prev_stack_ratio: False
+make_win_stack_ratio: True
+make_bet_total_ratio: False
+
+# Neural network config

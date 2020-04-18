@@ -1,6 +1,7 @@
 import numpy as np
 from agent import Agent
-import encode_state
+from encoding_functions import StateEncoder
+from deuces import Card
 
 ## Action format:
 # ['ACTION TYPE', int(value to transfer to pot)]
@@ -159,14 +160,18 @@ class RlBot:
         self.action_type_space = ['CALL', 'ALL_IN', 'CHECK', 
         'FOLD', 'RAISE_1', 'RAISE_2', 'RAISE_4', 'RAISE_8']
         
-        self.action_type_space = ['FOLD', 'ALL_IN']
-
-        self.agent = Agent(agent_name=agent_name, checkpoint_dir=checkpoint_dir, epsilon_testing=epsilon_testing,
-            action_names=self.action_type_space, training=training, state_shape=[8,],
-            render=False, use_logging=True)
+        self.action_type_space = ['CALL', 'ALL_IN', 'CHECK', 
+        'FOLD', 'RAISE_1', 'RAISE_1_5', 'RAISE_2', 'RAISE_2_5', 
+        'RAISE_3', 'RAISE_3_5', 'RAISE_4', 'RAISE_4_5']
 
         self.start_episode_stack = 0
-        self.state_encoder = encode_state.StateEncoder()
+        self.state_encoder = StateEncoder(checkpoint_dir)
+        state_shape = self.state_encoder.get_state_shape()
+
+        self.agent = Agent(agent_name=agent_name, checkpoint_dir=checkpoint_dir, epsilon_testing=epsilon_testing,
+            action_names=self.action_type_space, training=training, state_shape=[state_shape,],
+            render=False, use_logging=True)
+
     
     def start_episode(self, init_stack):
         self.start_episode_stack = init_stack
@@ -176,13 +181,27 @@ class RlBot:
         min_raise = table.big_blind
         max_raise = this_player.stack - current_bet
 
-        # state = self.state_encoder.encode_state_v1(table, this_player)
-        state, fold_state = self.state_encoder.encode_state_simple(table, this_player)
+
+        state = self.state_encoder.encode_state(this_player, table)
 
         # Get action from agent
-        action_idx = self.agent.get_action(this_player, table, state, fold_state)
+        action_idx = self.agent.get_action(this_player, table, state)
 
         chosen_action_type = self.action_type_space[action_idx]
+
+        # if self.agent.agent_name == "bvb_7":
+        #     Card.print_pretty_cards(this_player.hand)
+        #     Card.print_pretty_cards(table.board)
+        #     print(chosen_action_type)
+        #     print("")
+
+
+        # print(self.agent.agent_name)
+        # Card.print_pretty_cards(this_player.hand)
+        # Card.print_pretty_cards(table.board)
+        # print(chosen_action_type)
+        # print("")
+
 
         if chosen_action_type == "CALL":
             action_value = current_bet
@@ -196,30 +215,44 @@ class RlBot:
         elif chosen_action_type == "CHECK" or chosen_action_type == "FOLD":
             action_value = 0
 
-
         elif chosen_action_type == "RAISE_1":
             action_value = current_bet + table.big_blind
+            chosen_action_type = "RAISE"
+
+        elif chosen_action_type == "RAISE_1_5":
+            action_value = current_bet + table.big_blind * 1.5
             chosen_action_type = "RAISE"
 
         elif chosen_action_type == "RAISE_2":
             action_value = current_bet + table.big_blind * 2
             chosen_action_type = "RAISE"
 
+        elif chosen_action_type == "RAISE_2_5":
+            action_value = current_bet + table.big_blind * 2.5
+            chosen_action_type = "RAISE"
+
+        elif chosen_action_type == "RAISE_3":
+            action_value = current_bet + table.big_blind * 3
+            chosen_action_type = "RAISE"
+
+        elif chosen_action_type == "RAISE_3_5":
+            action_value = current_bet + table.big_blind * 3.5
+            chosen_action_type = "RAISE"
+
         elif chosen_action_type == "RAISE_4":
             action_value = current_bet + table.big_blind * 4
             chosen_action_type = "RAISE"
 
-        elif chosen_action_type == "RAISE_8":
-            action_value = current_bet + table.big_blind * 8
+        elif chosen_action_type == "RAISE_4_5":
+            action_value = current_bet + table.big_blind * 4.5
             chosen_action_type = "RAISE"
-
 
         else:
             print("invalid action, exiting...")
             exit()
 
         ret_action = [chosen_action_type, action_value]
-        return ret_action
+        return ret_action, state, fold_state
 
 
 
