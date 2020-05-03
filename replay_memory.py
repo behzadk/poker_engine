@@ -6,13 +6,15 @@ import time
 import csv
 import argparse
 import pickle
+import yaml
+import csv 
 
 class ReplayMemory:
     """
     Holds previous states of the game to be learned in batch
     """
 
-    def __init__(self, size, state_shape, num_actions, discount_factor=0.99):
+    def __init__(self, size, state_shape, num_actions, checkpoint_dir, discount_factor=0.99):
         """
         Args:
             size (int): Max number of states
@@ -37,6 +39,8 @@ class ReplayMemory:
         # Rewards observed for each of the states in the memory.
         self.rewards = np.zeros(shape=size, dtype=np.float)
 
+        self.num_actions = num_actions
+
 
         # Estimation errors for the Q-values. This is used to balance
         # the sampling of batches for training the Neural Network,
@@ -56,6 +60,22 @@ class ReplayMemory:
 
         self.reward_clippig_min_max  = [-1.0, 1.0]
 
+        self.q_error_clipping = 100.0
+
+        with open(checkpoint_dir + "encode_config.yaml", 'r') as yaml_file:
+            self.encode_config = yaml.load(yaml_file, Loader=yaml.FullLoader)
+
+        self.save_state_reward = self.encode_config['save_state_reward']
+
+
+        with open(checkpoint_dir + "action_config.yaml", 'r') as yaml_file:
+            self.action_config = yaml.load(yaml_file, Loader=yaml.FullLoader)
+
+        self.set_fold_q = self.action_config['set_fold_q']
+        
+
+        self.state_reward_path = checkpoint_dir + "state_reward.csv"
+
 
     def is_full(self):
         """ Returns bool indicating if replay memory is full """
@@ -73,22 +93,18 @@ class ReplayMemory:
 
         if not self.is_full():
             i = self.num_used
-            self.num_used += 1
 
-            # Store to replay memory
-            self.states[i] = state
-            self.q_values[i] = q_values
-            self.actions[i] = action
+            if self.set_fold_q and action == 3:
+                return 0
 
+            else:
+                # Store to replay memory
+                self.states[i] = state
+                self.q_values[i] = q_values
+                self.actions[i] = action
 
-            # if action == 0:
-            #     print(reward)
-
-            # Rewards clipped to prevent heavy weighting of outliers in training.
-            # self.rewards[i] = np.clip(reward, self.reward_clippig_min_max[0], self.reward_clippig_min_max[1])
-
-            self.rewards[i] = reward
-
+                self.rewards[i] = reward
+                self.num_used += 1
 
 
     def update_all_q_values(self):
@@ -104,9 +120,11 @@ class ReplayMemory:
 
         # print("num_used: ", self.num_used)
 
-        for i in reversed(range(self.num_used - 1)):
+        self.rewards = np.clip(self.rewards, -1, 1)
+
+        for i in reversed(range(self.num_used)):
             action = self.actions[i]
-            reward = self.rewards[i]            
+            reward = self.rewards[i]
             # print("q_values: ", self.q_values[i+1])
 
             # print(i)
@@ -119,25 +137,28 @@ class ReplayMemory:
             # Error of Q value estimation by the neural network
             # The difference between the actual value of the action taken and the estimated value
             # of that action
-            self.estimation_errors[i] = abs(action_value - self.q_values[i, action])
+            est_error = abs(action_value - self.q_values[i, action])
 
+            err_clip = self.q_error_clipping
 
-            # print(self.estimation_errors[i])
+            if est_error > err_clip and action_value < self.q_values[i, action]:
+                action_value = (self.q_values[i, action] - err_clip)
 
-            # print("av: ", action_value)
-            # print("reward: ", reward)
-
-            # print(action)
-            # print(self.states[i])
-            # print("")
-
-            # print(self.estimation_errors[i])
-
-            # print(action_value, self.q_values[i, action])
-
-            # print(abs(action_value - self.q_values[i, action]))
-
+            elif est_error > err_clip and action_value > self.q_values[i, action]:
+                action_value = (self.q_values[i, action] + err_clip)
+            
+            est_error = abs(action_value - self.q_values[i, action])
+            self.estimation_errors[i] = abs(est_error)
             self.q_values[i, action] = action_value
+
+        if self.save_state_reward:
+            with open(self.state_reward_path, "a") as f:
+                writer = csv.writer(f)
+                for i in reversed(range(self.num_used)):
+                    state_list = self.states[i].tolist()
+                    state_list.append(self.actions[i])
+                    state_list.append(self.rewards[i])
+                    writer.writerow(state_list)
 
 
     # def prepare_sampling_prob(self, batch_size=128):
@@ -314,7 +335,6 @@ class ReplayMemory:
         np.random.shuffle(all_sampled_idxs)
         states_batch = self.states[all_sampled_idxs]
         q_values_batch = self.q_values[all_sampled_idxs]
-        actions_batch = self.actions[all_sampled_idxs]
 
         return states_batch, q_values_batch
 
@@ -389,6 +409,7 @@ class ReplayMemory:
         q_values_batch = self.q_values[all_sampled_idxs]
         actions_batch = self.actions[all_sampled_idxs]
 
+
         return states_batch, q_values_batch
 
     def random_batch_v5(self):
@@ -403,16 +424,18 @@ class ReplayMemory:
         return states_batch, q_values_batch
 
     def random_batch_v6(self):
-        # all_indexes = np.argwhere(self.actions != 3).reshape(1, -1)[0]
-        all_indexes = list(range(len(self.actions)))
+        if self.set_fold_q:
+            all_indexes = np.argwhere(self.actions != 3).reshape(1, -1)[0]
+
+        else:
+            all_indexes = list(range(self.num_used))
+
         np.random.shuffle(all_indexes)
 
         # all_indexes = all_indexes[0:10]
 
-
         # states = [x for idx, x in enumerate(self.states) if idx in all_indexes]
         # q_values = [x for idx, x in enumerate(self.q_values) if idx in all_indexes]
-
         states = self.states[all_indexes]
         q_values = self.q_values[all_indexes]
 
@@ -420,7 +443,40 @@ class ReplayMemory:
         # print(states)
         # print(q_values)
         # exit()
+
         return states, q_values
+
+
+    # Equally sample different actions taken
+    def random_batch_v7(self):
+        self.actions_array = []
+        min_action_len = np.inf
+        
+        for action_class in range(self.num_actions):
+            # Get indexes that contain 
+            action_indexes = np.argwhere(self.actions == action_class)
+            action_indexes = list(action_indexes)
+            min_action_len = np.min([len(action_indexes), min_action_len])
+            self.actions_array.append(action_indexes)
+
+        index_choices = []
+
+        for action in self.actions_array:
+            action_choice_idxs = np.random.choice(len(action), size=int(min_action_len))
+            action_choice_idxs = list(action_choice_idxs)
+            index_choices = index_choices + action_choice_idxs
+            print(np.shape(index_choices))
+
+        print(min_action_len)
+        print(np.shape(index_choices))
+        index_choices = list(index_choices)
+        np.random.shuffle(index_choices)
+
+        states = self.states[index_choices]
+        q_values = self.q_values[index_choices]
+
+        return states, q_values
+
 
 
     def reset(self):

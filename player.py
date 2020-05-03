@@ -106,16 +106,13 @@ class Player:
     # actions are chosen from an action_policy script.
     ##
     def get_action(self, table, table_state, round_actions):
-        curent_bet = table.current_bet
-
         chosen_action = [self.id]
 
         if self.stack <= 0:
-            # self.all_in = True
             chosen_action += ['ALL_IN', 0]
 
         else:
-            action, state, fold_state = self.policy(table_state, self, round_actions)
+            action, state = self.policy(table_state, self, round_actions)
             chosen_action += action
             self.stack -= chosen_action[2]
             self.hand_action_count += 1
@@ -126,10 +123,8 @@ class Player:
         if self.stack <= 0:
             self.all_in = True
 
-        self.stage_actions.append(chosen_action)
+        # self.stage_actions.append(chosen_action)
         self.contribution_to_pot += chosen_action[2]
-
-        
 
         return chosen_action
 

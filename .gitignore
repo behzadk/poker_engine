@@ -9,3 +9,5 @@ output/
 q_values_log.txt
 reward_values_log.txt
 model_checkpoints/
+poker_hand_data/
+.idea/

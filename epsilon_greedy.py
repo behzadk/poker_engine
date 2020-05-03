@@ -65,7 +65,7 @@ class EpsilonGreedy:
     """
 
     def __init__(self, num_actions, epsilon_testing=0.05,
-        num_iterations=1e6, start_value=1.0, end_value=0.1, repeat=True):
+        num_iterations=1e6, start_value=1.0, end_value=0.1, repeat=False):
         """
         Args:
             num_actions (int): Number of possible actions in game environment
@@ -117,6 +117,7 @@ class EpsilonGreedy:
         # Probability of choosing random action
         if np.random.random() < epsilon:
             action = np.random.choice(valid_idxs)
+
 
         else:
             action = np.argmax(q_values)

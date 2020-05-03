@@ -37,6 +37,12 @@ class Table:
             p.hand = self.deck.draw(2)
             p.hand = sorted(p.hand, reverse=False)
 
+            if p.id == "HUMAN":
+                print("Your hand: \t")
+                Card.print_pretty_cards(p.hand)
+                print("")
+
+
     def generate_table_state(self):
         table_state = {
         'stage': self.stage,
@@ -116,6 +122,9 @@ class Table:
                     player_action = p.get_action(self, self, round_actions)
                     self.current_pot += player_action[2]
 
+                    if human_player:
+                        print(p.id, player_action[1], player_action[2])
+
                     if player_action[2] > self.current_bet:
                         self.current_bet = player_action[2]
 
@@ -152,6 +161,12 @@ class Table:
         self.current_pot += self.big_blind
         self.players[1].contribution_to_pot += self.big_blind
 
+        if human_player:
+            print(self.players[0].id, "Small blind: ", self.small_blind)
+            print(self.players[1].id, "Big blind: ", self.big_blind)
+            print("")
+
+
         # Take ante
         for p in self.players:
             p.stack  -= self.ante
@@ -164,7 +179,6 @@ class Table:
     # and the current board.
     ##
     def identify_winners(self, players):
-        player_hands = [p.hand for p in players]        
         best_rank = 7463  # rank one worse than worst hand
         winners = []
 
@@ -185,7 +199,6 @@ class Table:
         all_players = sorted(self.players, key=lambda p:p.contribution_to_pot, reverse=False)
 
         making_side_pots = True
-
         pots = []
 
         for p_1 in all_players:
@@ -281,35 +294,40 @@ class Table:
         self.take_blinds_and_ante()
         self.request_player_actions()
 
-        if debug == "SHOW_ACTIONS":
+        if human_player:
             print(self.stage, "POT: ", self.current_pot)
             print("")
+            Card.print_pretty_cards(self.board)
 
         ## Flop
         self.stage = stages[1]
         self.board += self.deck.draw(3)
         self.request_player_actions()
 
-        if debug == "SHOW_ACTIONS":
+        if human_player:
             print(self.stage, "POT: ", self.current_pot)
             print("")
+            Card.print_pretty_cards(self.board)
 
         # River
         self.stage = stages[2]
         self.board += [self.deck.draw(1)]
         self.request_player_actions()
-        if debug == "SHOW_ACTIONS":
+
+        if human_player:
             print(self.stage, "POT: ", self.current_pot)
             print("")
+            Card.print_pretty_cards(self.board)
 
         # Turn
         self.stage = stages[3]
         self.board += [self.deck.draw(1)]
         self.request_player_actions()
         
-        if debug == "SHOW_ACTIONS":
+        if human_player:
             print(self.stage, "POT: ", self.current_pot)
             print("")
+            Card.print_pretty_cards(self.board)
 
         # self.players[0].display_game_state(self, [])
         # Cleanup by allocating chips to winner

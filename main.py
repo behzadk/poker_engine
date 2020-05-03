@@ -13,7 +13,7 @@ from table import Table
 from global_constants import * 
 
 # def bot_battle(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name_agent_1):
-def bot_battle(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name_agent_1):
+def bot_battle_tournament(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name_agent_1):
     starting_stack = 10000
 
     print("Loading ", checkpoint_dir_0)
@@ -38,8 +38,6 @@ def bot_battle(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name_agent_1):
     player_1_wins = 0
 
     while games_played < 1000:
-        print(hand_count)
-
         table.play_single_hand()
         table.prepare_next_hand()
         hand_count += 1
@@ -63,37 +61,101 @@ def bot_battle(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name_agent_1):
 
             player_0.active = True
             player_1.active = True
-            print("GAMES PLYD: ", games_played, " P0 WINS: ", player_0_wins, " P1 WINS: ", player_1_wins, "P1/P0: ", player_1_wins / games_played)
+            print("GAMES PLYD: ", games_played, " P0 WINS: ", player_0_wins, " P1 WINS: ", player_1_wins, "P0/P1: ", player_0_wins / games_played)
 
             table.prepare_next_hand()
 
             # for p in players_list:
             #     p.write_actions_data()
 
-            if games_played == 10 and player_1_wins/games_played < 0.1:
+            if games_played == 10 and player_0_wins/games_played < 0.1:
                 break
 
-            if games_played == 30 and player_1_wins/games_played < 0.2:
+            if games_played == 30 and player_0_wins/games_played < 0.2:
                 break
 
-            if games_played == 100 and player_1_wins/games_played < 0.45:
+            if games_played == 100 and player_0_wins/games_played < 0.45:
                 break
 
-            if games_played == 300 and player_1_wins/games_played < 0.5:
+            if games_played == 300 and player_0_wins/games_played < 0.5:
                 break
 
-            if games_played == 500 and player_1_wins/games_played < 0.6:
+            if games_played == 500 and player_0_wins/games_played < 0.6:
                 break
 
-    print(player_1_wins / games_played)
+    print(player_0_wins / games_played)
 
-    return (player_1_wins / games_played)
+    return (player_0_wins / games_played)
+
+
+def bot_battle_chip_graph(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name_agent_1):
+    starting_stack = 10000
+
+    print("Loading ", checkpoint_dir_0)
+    policy_0 = action_policy.RlBot(agent_name=name_agent_0, training=False, epsilon_testing=0.0, checkpoint_dir=checkpoint_dir_0)
+    print("")
+    print("Loading ", checkpoint_dir_1)
+    policy_1 = action_policy.RlBot(agent_name=name_agent_1, training=False, epsilon_testing=0.0, checkpoint_dir=checkpoint_dir_1)
+
+    policy_0.agent.write_state_action = False
+    policy_1.agent.write_state_action = False
+
+    player_0 = Player(name_agent_0, starting_stack, policy=policy_0.get_action)
+    player_1 = Player(name_agent_1, starting_stack, policy=policy_1.get_action)
+
+    players_list = [player_0, player_1]
+    table = Table(players_list)
+
+    hand_count = 0
+    games_played = 0
+
+    player_0_wins = 0
+    player_1_wins = 0
+
+    player_0_stack_gross = 0
+    player_1_stack_gross = 0
+
+    p0_stack_history = [player_0.stack]
+    p1_stack_history = [player_1.stack]
+
+    p0_stack_gross_history = [0]
+    p1_stack_gross_history = [0]
+    hands_played = 0
+
+    while hands_played < 1000:
+        print(hands_played)
+        table.play_single_hand()
+        table.prepare_next_hand()
+        hand_count += 1
+
+        p0_stack_history.append(player_0.stack)
+        p1_stack_history.append(player_1.stack)
+
+        p0_change = (p0_stack_history[-1] - starting_stack)
+        p1_change = (p1_stack_history[-1] - starting_stack)
+
+        player_0_stack_gross += p0_change
+        player_1_stack_gross += p1_change
+
+        p0_stack_gross_history.append(player_0_stack_gross)
+        p1_stack_gross_history.append(player_1_stack_gross)
+
+        player_0.stack = starting_stack
+        player_1.stack = starting_stack
+
+        hands_played += 1
+
+    plt.plot(range(hands_played+1), p0_stack_gross_history, label="p0", color='green')
+    plt.plot(range(hands_played+1), p1_stack_gross_history, label="p1", color='red')
+    plt.show()
+
 
 def test_model_accuracy(model):
     starting_stack = 10000
     checkpoint_dir_0 = "./checkpoint_bvb_6"
     name_agent_0 = "bvb_6"
     name_agent_1 = "hero"
+
 
     policy_0 = action_policy.RlBot(agent_name=name_agent_0, training=False, epsilon_testing=1.0, checkpoint_dir=checkpoint_dir_0)
     policy_1 = action_policy.RlBot(agent_name=name_agent_1, training=False, epsilon_testing=0.0, checkpoint_dir=checkpoint_dir_0)
@@ -162,12 +224,10 @@ def test_model_accuracy(model):
 
     return (player_1_wins / games_played)
 
-
 def train_bot_vs_bot():
     starting_stack = 10000
-
-    p0_policy = action_policy.RlBot(agent_name="bvb_8", training=False, epsilon_testing=0.0, checkpoint_dir="./checkpoint_bvb_8/")
-    p1_policy = action_policy.RlBot(agent_name="bvb_9", training=True, epsilon_testing=0.1, checkpoint_dir="./checkpoint_bvb_9/")
+    p0_policy = action_policy.RlBot(agent_name="model_6", training=True, epsilon_testing=0.1, checkpoint_dir="./model_checkpoints/checkpoint_model_6/")
+    p1_policy = action_policy.RlBot(agent_name="model_3", training=False, epsilon_testing=0.0, checkpoint_dir="./model_checkpoints/checkpoint_model_3/")
 
     p0_bot = Player("p0_bot", starting_stack, policy=p0_policy.get_action)
     p1_bot = Player("p2_bot", starting_stack, policy=p1_policy.get_action)
@@ -182,10 +242,8 @@ def train_bot_vs_bot():
     hand_count = 0
     games_played = 0
     
-    min_max_scaling = lambda a, b, min_x, max_x, x: a + ((x - min_x) * (b - a)) / (max_x - min_x)
-
     for i in range(1, int(1e12)):
-        hand_count += 1
+        # hand_count += 1
         # print("")
         p0_bot.prev_stack = p0_bot.stack
         p1_bot.prev_stack = p1_bot.stack
@@ -196,32 +254,36 @@ def train_bot_vs_bot():
         p0_stack_history.append(p0_bot.stack)
         p1_stack_history.append(p1_bot.stack)
 
-        p1_stack_change = p1_stack_history[-1] - p1_stack_history[-2]
-        normalised_hand_reward = p1_stack_history[-1] / p1_stack_history[-2]
-        # max_change = p1_stack_history[-2] * 2
-        # normalised_hand_reward = min_max_scaling(0, 1, 0, 2, normalised_hand_reward)
-        # print(normalised_hand_reward)
+        if p0_policy.training and p0_bot.hand_action_count > 0:
+            p0_bot.hand_action_count = 0
+            if p0_stack_history[-1] > p0_stack_history[-2]:
+                normalised_p0_reward = (p0_stack_history[-1] - p0_stack_history[-2]) / p0_stack_history[-2]
+                p0_policy.agent.update_end_hand_reward(normalised_p0_reward)
 
-        if (hand_count % 100) == 0:
-            print(games_played, hand_count, p1_policy.agent.get_replay_memory_size())
-        # Normalised, max gain is twice what we started with
-        # minimum is to lose everything
+            else:
+                normalised_p0_reward = (p0_stack_history[-1] - p0_stack_history[-2]) / p0_stack_history[-2]
+                p0_policy.agent.update_end_hand_reward(normalised_p0_reward)
 
-        if p1_bot.hand_action_count > 0:
-            p1_policy.agent.update_end_hand_reward(0)
+
+        if p1_policy.training and p1_bot.hand_action_count > 0:
             p1_bot.hand_action_count = 0
+            if p1_stack_history[-1] > p1_stack_history[-2]:
+                normalised_p1_reward = (p1_stack_history[-1] - p1_stack_history[-2]) / p1_stack_history[-2]
+                p1_policy.agent.update_end_hand_reward(normalised_p1_reward)
+
+            else:
+                p1_policy.agent.update_end_hand_reward(0)
+
 
         if len(table.get_active_players()) <= 1:
-            normalised_p1_reward = (p1_stack_history[-1] / starting_stack) / 2
-            normalised_p1_reward = np.clip(normalised_p1_reward, 0, 1.0)
-            p1_policy.agent.update_end_episode_reward(normalised_p1_reward)
-            is_full = p1_policy.agent.update_replay_memory()
+            if p0_policy.training:
+                # normalised_p0_reward = ((p0_stack_history[-1] - p0_stack_history[-2]) / p0_stack_history[-2])
+                p0_policy.agent.update_end_episode_reward(0)
+                p0_policy.agent.update_replay_memory()
 
-                # if is_full :
-                #     return 0
-
-            p1_bot.hand_action_count = 0
-
+            if p1_policy.training:                                    
+                p1_policy.agent.update_end_episode_reward(0)
+                p1_policy.agent.update_replay_memory()
 
             p0_bot.stack = starting_stack
             p1_bot.stack = starting_stack
@@ -236,19 +298,28 @@ def train_bot_vs_bot():
             p1_bot.active = True
             games_played += 1
 
+            if games_played == 10:
+                return 0
+
             p0_bot.hand_action_count = 0
             p1_bot.hand_action_count = 0
 
             table.prepare_next_hand()
-            # for p in players_list:
-            #     p.actions_df = p.init_actions_dataframe()
+
+
+def train_from_history():
+    p0_policy = action_policy.RlBot(agent_name="model_6", training=True, epsilon_testing=0.1, checkpoint_dir="./model_checkpoints/checkpoint_model_6/")
+    agent = p0_policy.agent
+
+    agent.train_from_history_csv(learning_rate=0.00001)
 
 
 
 def simulate_game(checkpoint_dir_0, name_agent_0):
+    human_player = True
     starting_stack = 10000
 
-    p1_policy = action_policy.RlBot(agent_name=name_agent_0, training=False, epsilon_testing=1.0, checkpoint_dir=checkpoint_dir_0)
+    p1_policy = action_policy.RlBot(agent_name=name_agent_0, training=False, epsilon_testing=0.0, checkpoint_dir=checkpoint_dir_0)
 
     p1 = Player("HUMAN", starting_stack, policy=action_policy.huamn_action)
     rl_bot = Player("p1", starting_stack, policy=p1_policy.get_action)
@@ -263,7 +334,6 @@ def simulate_game(checkpoint_dir_0, name_agent_0):
 
     p1_stack_history.append(p1.stack)
     bot_stack_history.append(rl_bot.stack)
-
 
     rl_bot_wins = 0
     p1_wins = 0
@@ -314,17 +384,18 @@ def simulate_game(checkpoint_dir_0, name_agent_0):
 
 
 def main():
-    checkpoint_dir_0 = "./checkpoint_bvb_8/"
-    name_agent_0 = "bvb_8"
+    checkpoint_dir_0 = "./model_checkpoints/checkpoint_model_6/"
+    name_agent_0 = "model_6"
 
-    checkpoint_dir_1 = "./checkpoint_bvb_9/"
-    name_agent_1 = "bvb_9"
+    checkpoint_dir_1 = "./model_checkpoints/checkpoint_model_3/"
+    name_agent_1 = "model_3"
     # train_bot_vs_bot()
     # exit()
-    # simulate_game(checkpoint_dir_1, checkpoint_dir_1)
-
-    bot_battle(checkpoint_dir_0=checkpoint_dir_0, name_agent_0=name_agent_0, 
+    # simulate_game(checkpoint_dir_0, name_agent_0)
+    # exit()
+    bot_battle_chip_graph(checkpoint_dir_0=checkpoint_dir_0, name_agent_0=name_agent_0, 
         checkpoint_dir_1=checkpoint_dir_1, name_agent_1=name_agent_1)
+
     # simulate_game()
 
     # deck = Deck()
@@ -361,10 +432,14 @@ if __name__ == "__main__":
 
     # simulate_game(checkpoint_dir_1, name_agent_1)
     while True:
-        main()
-        print("Testing")
-        print("Training")
+        # train_from_history()
+        # exit()
+        # main()
+        # exit()
+        # print("Testing")
+        # print("Training")
         train_bot_vs_bot()
+        # exit()
 
 
 

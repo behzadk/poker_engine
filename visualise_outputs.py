@@ -3,13 +3,15 @@ import seaborn as sns
 import pandas as pd
 
 def visualise_loss():
-	model_name = "bvb_8"
-	train_data_path = "./" + model_name + "_count_states_win_rate.txt"
+	model_name = "model_6/"
+	train_data_path = "./model_checkpoints/checkpoint_" + model_name + "train_data.txt"
 
 	df = pd.read_csv(train_data_path, sep=",", header=None)
-	df.columns = ["learning_rate", "mean_epsilon", "loss", "acc"]
+	df.columns = ["count_states", "learning_rate", "mean_epsilon", "loss", "acc"]
 
-	sns.lineplot(x=df.index, y='loss', data=df)
+	g = sns.lineplot(x=df.index, y='loss', data=df)
+	g.set_yscale("log")
+	g.set_ylim(None, 1)
 	plt.show()
 
 	sns.lineplot(x=df.index, y='mean_epsilon', data=df)

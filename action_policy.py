@@ -2,6 +2,7 @@ import numpy as np
 from agent import Agent
 from encoding_functions import StateEncoder
 from deuces import Card
+import yaml
 
 ## Action format:
 # ['ACTION TYPE', int(value to transfer to pot)]
@@ -125,6 +126,7 @@ def huamn_action(table, this_player, round_actions):
             try:
                 raise_value = int(input("Choose raise value: "))
                 chosen_action_type = action_type_space[action_type_idx]
+                break
 
             except (IndexError, ValueError):
                 print("invalid index, please choose again")
@@ -134,7 +136,6 @@ def huamn_action(table, this_player, round_actions):
                 print("Going all in")
                 raise_value = this_player.stack
 
-            break
 
         action_value = current_bet + raise_value
 
@@ -157,30 +158,41 @@ def huamn_action(table, this_player, round_actions):
 
 class RlBot:
     def __init__(self, agent_name, training, epsilon_testing, checkpoint_dir):
-        self.action_type_space = ['CALL', 'ALL_IN', 'CHECK', 
-        'FOLD', 'RAISE_1', 'RAISE_2', 'RAISE_4', 'RAISE_8']
+        # self.action_type_space = ['CALL', 'ALL_IN', 'CHECK', 
+        # 'FOLD', 'RAISE_1', 'RAISE_2', 'RAISE_4', 'RAISE_8']
         
-        self.action_type_space = ['CALL', 'ALL_IN', 'CHECK', 
-        'FOLD', 'RAISE_1', 'RAISE_1_5', 'RAISE_2', 'RAISE_2_5', 
-        'RAISE_3', 'RAISE_3_5', 'RAISE_4', 'RAISE_4_5']
+        # self.action_type_space = ['CALL', 'ALL_IN', 'CHECK', 
+        # 'FOLD', 'RAISE_1', 'RAISE_1_5', 'RAISE_2', 'RAISE_2_5', 
+        # 'RAISE_3', 'RAISE_3_5', 'RAISE_4', 'RAISE_4_5']
+
+        with open(checkpoint_dir + "action_config.yaml", 'r') as yaml_file:
+            self.action_config = yaml.load(yaml_file, Loader=yaml.FullLoader)
+
+        raise_action_space = self.action_config['raise_actions']
+
+        self.action_type_space = ['CALL', 'ALL_IN', 'CHECK', 'FOLD']
+        self.action_type_space.extend(raise_action_space)
+
 
         self.start_episode_stack = 0
         self.state_encoder = StateEncoder(checkpoint_dir)
         state_shape = self.state_encoder.get_state_shape()
 
+
+        print("State input shape: ", state_shape)
+
         self.agent = Agent(agent_name=agent_name, checkpoint_dir=checkpoint_dir, epsilon_testing=epsilon_testing,
             action_names=self.action_type_space, training=training, state_shape=[state_shape,],
             render=False, use_logging=True)
 
-    
+        self.training = training
+
+
     def start_episode(self, init_stack):
         self.start_episode_stack = init_stack
 
     def get_action(self, table, this_player, round_actions):
         current_bet = table.current_bet
-        min_raise = table.big_blind
-        max_raise = this_player.stack - current_bet
-
 
         state = self.state_encoder.encode_state(this_player, table)
 
@@ -246,13 +258,17 @@ class RlBot:
         elif chosen_action_type == "RAISE_4_5":
             action_value = current_bet + table.big_blind * 4.5
             chosen_action_type = "RAISE"
-
+        
         else:
             print("invalid action, exiting...")
             exit()
 
+        action_reward = - action_value / this_player.prev_stack
+        self.agent.hand_rewards.append(action_reward)
+
+
         ret_action = [chosen_action_type, action_value]
-        return ret_action, state, fold_state
+        return ret_action, state
 
 
 

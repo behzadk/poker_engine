@@ -16,12 +16,18 @@ class StateEncoder:
         # +  9 - used for board cards when they have not been dealt
         all_card_suit_values = np.array([0, 1, 2, 4, 8]).reshape(5, 1)
 
-
         self.rank_enc = OneHotEncoder(handle_unknown='error', categories='auto')
         self.rank_enc.fit(all_card_rank_values)
 
         self.suit_enc = OneHotEncoder(handle_unknown='error', categories='auto')
         self.suit_enc.fit(all_card_suit_values)
+
+        deck = Deck()
+        all_card_raw_values = deck.draw(52)
+        all_card_raw_values.sort()
+        all_card_raw_values = np.array(all_card_raw_values).reshape(52, 1)
+        self.raw_card_enc = OneHotEncoder(handle_unknown='error', categories='auto')
+        self.raw_card_enc.fit(all_card_raw_values)
 
         # Put in  dummy variables for undealt cards
         self.table_card_ranks = [0 for x in range(5)]
@@ -50,8 +56,14 @@ class StateEncoder:
         if self.encoding_config['make_board_suit_dummies']:
             n_inputs += 20
 
+        if self.encoding_config['make_single_vector_cards_state']:
+            n_inputs += 52
+
         if self.encoding_config['make_stage_dummies']:
             n_inputs += 4
+
+        if self.encoding_config['make_preflop_probability']:
+            n_inputs += 1
 
         if self.encoding_config['make_score']:
             n_inputs += 1
@@ -65,8 +77,18 @@ class StateEncoder:
         if self.encoding_config['make_win_stack_ratio']:
             n_inputs += 1
 
-        if self.encoding_config['make_bet_total_ratio']:
+        if self.encoding_config['make_pot_stack_ratio']:
             n_inputs += 1
+
+        if self.encoding_config['make_bet_stack_ratio']:
+            n_inputs += 1
+
+        if self.encoding_config['make_stack_min_bet_ratio']:
+            n_inputs += 1
+
+        if self.encoding_config['make_is_suited']:
+            n_inputs += 1
+
 
         return n_inputs
 
@@ -74,6 +96,7 @@ class StateEncoder:
     def normalise_preflop_arrays(self):
         max_value = np.max(self.preflop_unsuited_array)
         min_value = np.min(self.preflop_unsuited_array)
+
         self.preflop_suited_array = self.min_max_scaling(0, 1, min_value, max_value, self.preflop_suited_array)
         self.preflop_unsuited_array = self.min_max_scaling(0, 1, min_value, max_value, self.preflop_unsuited_array)
 
@@ -110,8 +133,6 @@ class StateEncoder:
 
     def make_board_rank_dummies(self, table):
         card_dummies = []
-        print("here")
-        print(table.board)
 
         table_card_ranks = self.table_card_ranks[:]
 
@@ -145,6 +166,21 @@ class StateEncoder:
 
         return card_dummies
 
+    def make_single_vector_cards_state(self, hero_player, table):
+        hand = hero_player.hand
+        board = [x for x in table.board if x != 13]
+
+        cards = hand + board
+
+        cards = np.array(cards).reshape(-1, 1)
+
+        single_enc_vec = self.raw_card_enc.transform(cards).toarray()
+        state = np.sum(single_enc_vec, axis=0).reshape(1, -1)
+
+        return state
+
+
+
     def make_stage_dummies(self, table):
         is_preflop = 0
         is_flop = 0
@@ -167,6 +203,25 @@ class StateEncoder:
 
         return(stage_dummies)
 
+    def make_preflop_probability(self, hero_player, table):
+        if table.stage == "PREFLOP":
+            card_0_rank = Card.get_rank_int(hero_player.hand[0])
+            card_0_suit = Card.get_suit_int(hero_player.hand[0])
+
+            card_1_rank = Card.get_rank_int(hero_player.hand[1])
+            card_1_suit = Card.get_suit_int(hero_player.hand[1])
+
+            if card_0_suit == card_1_suit:
+                hero_score = self.preflop_suited_array[card_0_rank, card_1_rank]
+
+            else:
+                hero_score = self.preflop_unsuited_array[card_0_rank, card_1_rank]
+
+        else:
+            hero_score = -1
+
+        return np.array(hero_score).reshape(1, -1)
+
     def make_score(self, hero_player, table):
         if table.stage == "PREFLOP":
             is_preflop = 1
@@ -179,20 +234,10 @@ class StateEncoder:
         if not is_preflop:
             board = [x for x in table.board if x != 13]
             hero_score = self.evaluator.evaluate(board, hero_player.hand)
-            hero_score = self.min_max_scaling(0, 1, 0, 7462, hero_score)
+            hero_score = self.min_max_scaling(0, 1, 0, 7462, hero_score)            
 
         else:
-            card_0_rank = Card.get_rank_int(hero_player.hand[0])
-            card_0_suit = Card.get_suit_int(hero_player.hand[0])
-
-            card_1_rank = Card.get_rank_int(hero_player.hand[1])
-            card_1_suit = Card.get_suit_int(hero_player.hand[1])
-
-            if card_0_suit == card_1_suit:
-                hero_score = self.preflop_suited_array[card_0_rank, card_1_rank]
-
-            else:
-                hero_score = self.preflop_unsuited_array[card_0_rank, card_1_rank]
+            hero_score = -1.0
 
         return np.array(hero_score).reshape(1, -1)
 
@@ -207,9 +252,27 @@ class StateEncoder:
         win_stack_ratio = (hero_player.stack + table.current_pot) / hero_player.prev_stack
         return np.array(win_stack_ratio).reshape(1, -1)
 
-    def make_bet_total_ratio(self, table):
-        bet_total_ratio = table.current_bet/table.total_chips
-        return np.array(bet_total_ratio).reshape(1, -1)
+    def make_stack_min_bet_ratio(self, hero_player, table):
+        stack_min_bet_ratio = (table.big_blind) / hero_player.stack
+        return np.array(stack_min_bet_ratio).reshape(1, -1)
+
+    def make_bet_stack_ratio(self, hero_player, table):
+        bet_stack_ratio = table.current_bet / hero_player.stack
+        return np.array(bet_stack_ratio).reshape(1, -1)
+
+    def make_pot_stack_ratio(self, hero_player, table):
+        make_pot_stack_ratio = table.current_pot / hero_player.stack
+
+        return np.array(make_pot_stack_ratio).reshape(1, -1)
+
+
+    def make_is_suited(self, hero_player):
+        if Card.get_suit_int(hero_player.hand[0]) == Card.get_suit_int(hero_player.hand[1]):
+            return np.array(1).reshape(1, -1)
+
+        else:
+            return np.array(0).reshape(1, -1)
+
 
     def encode_state(self, hero_player, table):
         state = []
@@ -226,8 +289,14 @@ class StateEncoder:
         if self.encoding_config['make_board_suit_dummies']:
             state.append(self.make_board_suit_dummies(table))
 
+        if self.encoding_config['make_single_vector_cards_state']:
+            state.append(self.make_single_vector_cards_state(hero_player, table))
+
         if self.encoding_config['make_stage_dummies']:
             state.append(self.make_stage_dummies(table))
+
+        if self.encoding_config['make_preflop_probability']:
+            state.append(self.make_preflop_probability(hero_player, table))
 
         if self.encoding_config['make_score']:
             state.append(self.make_score(hero_player, table))
@@ -241,14 +310,23 @@ class StateEncoder:
         if self.encoding_config['make_win_stack_ratio']:
             state.append(self.make_win_stack_ratio(hero_player, table))
 
-        if self.encoding_config['make_bet_total_ratio']:
-            state.append(self.make_bet_total_ratio(table))
+        if self.encoding_config['make_bet_stack_ratio']:
+            state.append(self.make_bet_stack_ratio(hero_player, table))
+
+        if self.encoding_config['make_pot_stack_ratio']:
+            state.append(self.make_pot_stack_ratio(hero_player, table))
+
+        if self.encoding_config['make_stack_min_bet_ratio']:
+            state.append(self.make_stack_min_bet_ratio(hero_player, table))
+
+        if self.encoding_config['make_is_suited']:
+            state.append(self.make_is_suited(hero_player))
+
 
         state = np.concatenate(state, axis=1).reshape(1, -1)
 
         return state
 
 
-
-
-
+if __name__ == "__main__":
+    deck = Deck()
