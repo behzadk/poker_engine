@@ -147,7 +147,10 @@ def bot_battle_chip_graph(checkpoint_dir_0, name_agent_0, checkpoint_dir_1, name
 
     plt.plot(range(hands_played+1), p0_stack_gross_history, label="p0", color='green')
     plt.plot(range(hands_played+1), p1_stack_gross_history, label="p1", color='red')
-    plt.show()
+
+    plt.savefig(checkpoint_dir_0 + str(int(policy_0.agent.model.get_count_states().numpy())) + ".pdf")
+    plt.close()
+    plt.clf()
 
 
 def test_model_accuracy(model):
@@ -241,6 +244,7 @@ def train_bot_vs_bot():
     p1_stack_history.append(p1_bot.stack)
     hand_count = 0
     games_played = 0
+    mem_updates = 0
     
     for i in range(1, int(1e12)):
         # hand_count += 1
@@ -279,7 +283,13 @@ def train_bot_vs_bot():
             if p0_policy.training:
                 # normalised_p0_reward = ((p0_stack_history[-1] - p0_stack_history[-2]) / p0_stack_history[-2])
                 p0_policy.agent.update_end_episode_reward(0)
-                p0_policy.agent.update_replay_memory()
+                is_full = p0_policy.agent.update_replay_memory()
+
+                if is_full:
+                    mem_updates += 1
+
+                if mem_updates > 10:
+                    return 0
 
             if p1_policy.training:                                    
                 p1_policy.agent.update_end_episode_reward(0)
@@ -298,8 +308,6 @@ def train_bot_vs_bot():
             p1_bot.active = True
             games_played += 1
 
-            if games_played == 10:
-                return 0
 
             p0_bot.hand_action_count = 0
             p1_bot.hand_action_count = 0
@@ -434,11 +442,12 @@ if __name__ == "__main__":
     while True:
         # train_from_history()
         # exit()
-        # main()
         # exit()
         # print("Testing")
         # print("Training")
+        main()
         train_bot_vs_bot()
+
         # exit()
 
 

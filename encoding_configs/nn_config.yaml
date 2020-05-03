@@ -1,0 +1,6 @@
+layers: [1024,512,1024,512]
+huber_delta: 2.0
+
+learning_rate: 0.0001
+start_learning_rate: 0.0001
+end_learning_rate: 0.0001

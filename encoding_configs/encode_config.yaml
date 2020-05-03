@@ -1,0 +1,18 @@
+# Encoding config
+make_hand_rank_dummies: False
+make_hand_suit_dummies: False
+make_board_rank_dummies: False
+make_board_suit_dummies: False
+make_stage_dummies: False
+make_score: False
+make_hero_position: True
+make_stack_prev_stack_ratio: False
+make_stack_min_bet_ratio: False
+make_win_stack_ratio: False
+make_bet_stack_ratio: True
+make_pot_stack_ratio: True
+make_is_suited: False
+make_preflop_probability: False
+make_single_vector_cards_state: True
+
+save_state_reward: True
